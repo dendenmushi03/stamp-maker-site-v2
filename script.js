@@ -13,6 +13,8 @@ let imageOffsetX = 0, imageOffsetY = 0;
 let lastTapTime = 0;
 let lastTapPos = { x: 0, y: 0 };
 
+const bubbleShapeSelect = document.getElementById("bubbleShape");
+
 document.getElementById("imageUpload").addEventListener("change", (e) => {
   const file = e.target.files[0];
   const reader = new FileReader();
@@ -30,8 +32,10 @@ document.getElementById("imageUpload").addEventListener("change", (e) => {
 });
 
 document.getElementById("addBubble").addEventListener("click", () => {
+  const selectedShape = bubbleShapeSelect?.value || "rounded";
   elements.push({
     type: "bubble",
+    shape: selectedShape,
     x: 50,
     y: 50,
     w: 150,
@@ -74,21 +78,133 @@ document.getElementById("deleteSelected").addEventListener("click", () => {
   }
 });
 
-document.getElementById("resetImagePosition").addEventListener("click", () => {
-  if (baseImage) {
-    imageX = 0;
-    imageY = 0;
-    renderCanvas();
+function drawBubbleShape(el, ctx) {
+  const { x, y, w, h, shape } = el;
+  ctx.beginPath();
+  switch (shape) {
+    case "oval":
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
+      break;
+    case "rounded":
+      ctx.roundRect(x, y, w, h, 15);
+      break;
+    case "spike1":
+      drawSpikeBubble(ctx, x, y, w, h, 10);
+      break;
+    case "spike2":
+      drawSpikeBubble(ctx, x, y, w, h, 16);
+      break;
+    case "thought1":
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
+      drawThoughtDots(ctx, x + w, y + h);
+      break;
+    case "thought2":
+      drawCloudBubble(ctx, x, y, w, h);
+      drawThoughtDots(ctx, x + w, y + h);
+      break;
+    default:
+      ctx.roundRect(x, y, w, h, 15);
   }
-});
+  ctx.closePath();
+}
 
-let offsetX, offsetY;
+function drawSpikeBubble(ctx, x, y, w, h, spikes) {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const outerRadius = Math.min(w, h) / 2;
+  const innerRadius = outerRadius * 0.7;
+  const step = Math.PI / spikes;
+  ctx.moveTo(cx + outerRadius, cy);
+  for (let i = 0; i < 2 * spikes; i++) {
+    const r = (i % 2 === 0) ? outerRadius : innerRadius;
+    const angle = i * step;
+    ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+  }
+  ctx.closePath();
+}
+
+function drawCloudBubble(ctx, x, y, w, h) {
+  const r = 10;
+  const steps = 12;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i / steps) * 2 * Math.PI;
+    const cx = x + w / 2 + (w / 2 - r) * Math.cos(angle);
+    const cy = y + h / 2 + (h / 2 - r) * Math.sin(angle);
+    ctx.moveTo(cx + r, cy);
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  }
+}
+
+function drawThoughtDots(ctx, x, y) {
+  ctx.moveTo(x, y);
+  ctx.arc(x + 5, y + 5, 5, 0, 2 * Math.PI);
+  ctx.moveTo(x + 15, y + 15);
+  ctx.arc(x + 15, y + 15, 3, 0, 2 * Math.PI);
+}
+
+function drawPointer(el) {
+  const { x, y, w, h, pointerPosition, pointerOffset, fill } = el;
+  const size = 15;
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  switch (pointerPosition) {
+    case "top":
+      const px1 = x + w * pointerOffset;
+      ctx.moveTo(px1 - size / 2, y);
+      ctx.lineTo(px1, y - size);
+      ctx.lineTo(px1 + size / 2, y);
+      break;
+    case "bottom":
+      const px2 = x + w * pointerOffset;
+      ctx.moveTo(px2 - size / 2, y + h);
+      ctx.lineTo(px2, y + h + size);
+      ctx.lineTo(px2 + size / 2, y + h);
+      break;
+    case "left":
+      const py1 = y + h * pointerOffset;
+      ctx.moveTo(x, py1 - size / 2);
+      ctx.lineTo(x - size, py1);
+      ctx.lineTo(x, py1 + size / 2);
+      break;
+    case "right":
+      const py2 = y + h * pointerOffset;
+      ctx.moveTo(x + w, py2 - size / 2);
+      ctx.lineTo(x + w + size, py2);
+      ctx.lineTo(x + w, py2 + size / 2);
+      break;
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function renderCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (baseImage) ctx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
+
+  for (const el of elements) {
+    if (el.type === "bubble") {
+      ctx.fillStyle = el.fill;
+      drawBubbleShape(el, ctx);
+      ctx.fill();
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      drawPointer(el);
+    }
+
+    if (el.type === "text") {
+      ctx.font = `${el.size || 24}px ${el.font}`;
+      ctx.fillStyle = el.color;
+      ctx.fillText(el.text, el.x, el.y);
+    }
+  }
+}
 
 canvas.addEventListener("mousedown", onMouseDown);
 canvas.addEventListener("mousemove", onMouseMove);
 canvas.addEventListener("mouseup", onMouseUp);
 canvas.addEventListener("touchstart", onTouchStart);
-
 canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
   onMouseMove(convertTouchToMouseEvent(e));
@@ -97,6 +213,14 @@ canvas.addEventListener("touchend", (e) => {
   e.preventDefault();
   onMouseUp();
 });
+
+function getMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  };
+}
 
 function onMouseDown(e) {
   const pos = getMousePos(e);
@@ -165,7 +289,6 @@ function onMouseDown(e) {
     }
   }
 
-  // どれも選ばれていなければ画像をドラッグ可能にする
   if (baseImage) {
     imageDragging = true;
     imageOffsetX = pos.x - imageX;
@@ -204,11 +327,9 @@ function onMouseMove(e) {
       }
     } else if (selectedElement.type === "text") {
       if (selectedElement.resizing) {
-  const dy = pos.y - resizeStartY;
-  selectedElement.size = Math.max(8, initialFontSize + dy * 0.2); // ← 感度を調整
-}
-
- else if (selectedElement.dragging) {
+        const dy = pos.y - resizeStartY;
+        selectedElement.size = Math.max(8, initialFontSize + dy * 0.2);
+      } else if (selectedElement.dragging) {
         selectedElement.x = pos.x - offsetX;
         selectedElement.y = pos.y - offsetY;
       }
@@ -229,15 +350,7 @@ function onMouseUp() {
   }
   imageDragging = false;
   resizeStartY = null;
-initialFontSize = null;
-}
-
-function getMousePos(e) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
-  };
+  initialFontSize = null;
 }
 
 function getPointerPos(el) {
@@ -250,103 +363,51 @@ function getPointerPos(el) {
   }
 }
 
-function drawPointer(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset } = el;
-  const size = 15;
-  ctx.fillStyle = el.fill;
-  ctx.beginPath();
-  switch (pointerPosition) {
-    case "top":
-      const px1 = x + w * pointerOffset;
-      ctx.moveTo(px1 - size / 2, y);
-      ctx.lineTo(px1, y - size);
-      ctx.lineTo(px1 + size / 2, y);
-      break;
-    case "bottom":
-      const px2 = x + w * pointerOffset;
-      ctx.moveTo(px2 - size / 2, y + h);
-      ctx.lineTo(px2, y + h + size);
-      ctx.lineTo(px2 + size / 2, y + h);
-      break;
-    case "left":
-      const py1 = y + h * pointerOffset;
-      ctx.moveTo(x, py1 - size / 2);
-      ctx.lineTo(x - size, py1);
-      ctx.lineTo(x, py1 + size / 2);
-      break;
-    case "right":
-      const py2 = y + h * pointerOffset;
-      ctx.moveTo(x + w, py2 - size / 2);
-      ctx.lineTo(x + w + size, py2);
-      ctx.lineTo(x + w, py2 + size / 2);
-      break;
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
+document.getElementById("saveImage").addEventListener("click", () => {
+  const tempCanvas = document.createElement("canvas");
+  const tempCtx = tempCanvas.getContext("2d");
 
-function renderCanvas() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
+
   if (baseImage) {
-    ctx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
+    tempCtx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
   }
 
   for (const el of elements) {
     if (el.type === "bubble") {
-      ctx.fillStyle = el.fill;
-      ctx.beginPath();
-      ctx.roundRect(el.x, el.y, el.w, el.h, 15);
-      ctx.fill();
-      ctx.strokeStyle = "black";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      drawPointer(el);
-
-      if (el === selectedElement) {
-        ctx.fillStyle = "blue";
-        ctx.fillRect(el.x + el.w - 5, el.y + el.h - 5, 10, 10);
-        const p = getPointerPos(el);
-        ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
-      }
-    }
-
-    if (el.type === "text") {
-      ctx.font = `${el.size || 24}px ${el.font}`;
-      ctx.fillStyle = el.color;
-      ctx.fillText(el.text, el.x, el.y);
-
-      if (el === selectedElement) {
-        const width = ctx.measureText(el.text).width;
-        const height = el.size || 24;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeStyle = "black";
-        ctx.strokeRect(el.x, el.y - height + 4, width, height);
-        ctx.setLineDash([]);
-        ctx.fillStyle = "blue";
-        ctx.fillRect(el.x + width - 5, el.y - height - 5, 10, 10);
-      }
+      tempCtx.fillStyle = el.fill;
+      drawBubbleShape(el, tempCtx);
+      tempCtx.fill();
+      tempCtx.strokeStyle = "black";
+      tempCtx.lineWidth = 1;
+      tempCtx.stroke();
+      drawPointerToContext(tempCtx, el);
+    } else if (el.type === "text") {
+      tempCtx.font = `${el.size || 24}px ${el.font}`;
+      tempCtx.fillStyle = el.color;
+      tempCtx.fillText(el.text, el.x, el.y);
     }
   }
-}
 
-CanvasRenderingContext2D.prototype.roundRect = function (x, y, width, height, radius) {
-  if (typeof radius === "undefined") radius = 5;
-  if (typeof radius === "number") radius = { tl: radius, tr: radius, br: radius, bl: radius };
-  this.beginPath();
-  this.moveTo(x + radius.tl, y);
-  this.lineTo(x + width - radius.tr, y);
-  this.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
-  this.lineTo(x + width, y + height - radius.br);
-  this.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
-  this.lineTo(x + radius.bl, y + height);
-  this.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
-  this.lineTo(x, y + radius.tl);
-  this.quadraticCurveTo(x, y, x + radius.tl, y);
-  this.closePath();
-  return this;
-};
+  const dataURL = tempCanvas.toDataURL();
+
+  const link = document.createElement("a");
+  link.download = "stamp.png";
+  link.href = dataURL;
+  link.click();
+
+  const modalImg = document.getElementById("savedImagePreview");
+  modalImg.src = dataURL;
+
+  const encodedUrl = encodeURIComponent(window.location.href);
+  const encodedText = encodeURIComponent("スタンプメーカーで画像を作ってみたよ！ #スタンプメーカー");
+  document.getElementById("modalShareX").href = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+  document.getElementById("modalShareLINE").href = `https://social-plugins.line.me/lineit/share?url=${encodedUrl}`;
+  document.getElementById("modalShareInsta").href = `https://www.instagram.com`;
+
+  document.getElementById("saveModal").style.display = "flex";
+});
 
 function drawPointerToContext(ctx, el) {
   const { x, y, w, h, pointerPosition, pointerOffset } = el;
@@ -384,61 +445,6 @@ function drawPointerToContext(ctx, el) {
   ctx.stroke();
 }
 
-// ...すでにあるすべての既存コード（中略）...
-
-document.getElementById("saveImage").addEventListener("click", () => {
-  const tempCanvas = document.createElement("canvas");
-  const tempCtx = tempCanvas.getContext("2d");
-
-  tempCanvas.width = canvas.width;
-  tempCanvas.height = canvas.height;
-
-  if (baseImage) {
-    tempCtx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
-  }
-
-  for (const el of elements) {
-    if (el.type === "bubble") {
-      tempCtx.fillStyle = el.fill;
-      tempCtx.beginPath();
-      tempCtx.roundRect(el.x, el.y, el.w, el.h, 15);
-      tempCtx.fill();
-      tempCtx.strokeStyle = "black";
-      tempCtx.lineWidth = 1;
-      tempCtx.stroke();
-      drawPointerToContext(tempCtx, el);
-    } else if (el.type === "text") {
-      tempCtx.font = `${el.size || 24}px ${el.font}`;
-      tempCtx.fillStyle = el.color;
-      tempCtx.fillText(el.text, el.x, el.y);
-    }
-  }
-
-  const dataURL = tempCanvas.toDataURL();
-
-  // ✅ 画像を保存（ダウンロード）
-  const link = document.createElement("a");
-  link.download = "stamp.png";
-  link.href = dataURL;
-  link.click();
-
-  // ✅ モーダルに画像を表示
-  const modalImg = document.getElementById("savedImagePreview");
-  modalImg.src = dataURL;
-
-  // ✅ SNSシェアリンク設定
-  const encodedUrl = encodeURIComponent(window.location.href);
-  const encodedText = encodeURIComponent("スタンプメーカーで画像を作ってみたよ！ #スタンプメーカー");
-  const encodedImg = encodeURIComponent(dataURL);
-
-  document.getElementById("modalShareX").href = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
-  document.getElementById("modalShareLINE").href = `https://social-plugins.line.me/lineit/share?url=${encodedUrl}`;
-  document.getElementById("modalShareInsta").href = `https://www.instagram.com`;
-
-  // ✅ モーダルを表示
-  document.getElementById("saveModal").style.display = "flex";
-});
-
 document.getElementById("closeModal").addEventListener("click", () => {
   document.getElementById("saveModal").style.display = "none";
 });
@@ -446,22 +452,18 @@ document.getElementById("closeModal").addEventListener("click", () => {
 function onTouchStart(e) {
   if (e.touches.length > 1) return;
 
-  e.preventDefault();  // ← 追加（スクロール阻止）
-
+  e.preventDefault();
   const now = new Date().getTime();
   const pos = getTouchPos(e);
 
-  // ダブルタップ処理
   if (now - lastTapTime < 300) {
     const dx = pos.x - lastTapPos.x;
     const dy = pos.y - lastTapPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance < 20) {
+    if (Math.sqrt(dx * dx + dy * dy) < 20) {
       handleDoubleTap(pos);
     }
   }
 
-  // 選択操作も追加（onMouseDown 相当）
   onMouseDown(convertTouchToMouseEvent(e));
 
   lastTapTime = now;
@@ -476,16 +478,22 @@ function getTouchPos(e) {
   };
 }
 
+function convertTouchToMouseEvent(touchEvent) {
+  const touch = touchEvent.touches[0] || touchEvent.changedTouches[0];
+  return {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+  };
+}
+
 function handleDoubleTap(pos) {
   selectedElement = null;
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
     if (el.type === "bubble") {
       if (
-        pos.x >= el.x &&
-        pos.x <= el.x + el.w &&
-        pos.y >= el.y &&
-        pos.y <= el.y + el.h
+        pos.x >= el.x && pos.x <= el.x + el.w &&
+        pos.y >= el.y && pos.y <= el.y + el.h
       ) {
         selectedElement = el;
         break;
@@ -509,15 +517,6 @@ function handleDoubleTap(pos) {
   renderCanvas();
 }
 
-function convertTouchToMouseEvent(touchEvent) {
-  const touch = touchEvent.touches[0] || touchEvent.changedTouches[0];
-  return {
-    clientX: touch.clientX,
-    clientY: touch.clientY,
-  };
-}
-
-// モーダル画像をタップしたら別タブで開く（iPhone長押し対応）
 document.getElementById("savedImagePreview").addEventListener("click", () => {
   const dataURL = document.getElementById("savedImagePreview").src;
   const newWindow = window.open();
@@ -527,15 +526,3 @@ document.getElementById("savedImagePreview").addEventListener("click", () => {
     alert("ポップアップがブロックされました。設定をご確認ください。");
   }
 });
-
-// script.js（index.html 起動時に読み取る）
-const fromBgRemoval = localStorage.getItem("bgRemovedImage");
-if (fromBgRemoval) {
-  const img = new Image();
-  img.onload = () => {
-    baseImage = img;
-    drawCanvas(); // キャンバスに描画
-  };
-  img.src = fromBgRemoval;
-  localStorage.removeItem("bgRemovedImage");
-}
