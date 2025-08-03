@@ -5,35 +5,7 @@
   <title>背景除去ツール（人物のみ切り抜き）</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1"></script>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      background-color: #f4f4f4;
-      padding: 30px;
-    }
-    .container {
-      display: flex;
-      justify-content: center;
-      gap: 40px;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-    .preview-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    img {
-      max-width: 300px;
-      height: auto;
-      border: 1px solid #ccc;
-      background-color: white;
-    }
-    canvas {
-      display: none;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <h1>背景除去ツール（人物のみ切り抜き）</h1>
@@ -52,53 +24,6 @@
 
   <canvas id="canvas"></canvas>
 
-  <script>
-    const upload = document.getElementById('upload');
-    const originalImage = document.getElementById('originalImage');
-    const outputImage = document.getElementById('outputImage');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-
-    let net = null;
-
-    async function loadModel() {
-      net = await bodyPix.load();
-      console.log("モデル読み込み完了");
-    }
-
-    upload.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file || !net) return;
-
-      const img = new Image();
-      img.onload = async () => {
-        originalImage.src = img.src;
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-
-        const segmentation = await net.segmentPerson(img);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-
-        for (let i = 0; i < pixels.length / 4; i++) {
-          if (segmentation.data[i] === 0) {
-            pixels[i * 4 + 3] = 0; // 透明化
-          }
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-
-        // canvasをimgに変換して出力
-        outputImage.src = canvas.toDataURL('image/png');
-      };
-
-      img.src = URL.createObjectURL(file); // onload前に設定（これはOK）
-    });
-
-    loadModel();
-  </script>
+  <script src="remove-bg.js"></script>
 </body>
 </html>

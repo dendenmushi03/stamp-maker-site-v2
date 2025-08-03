@@ -6,19 +6,15 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
 app.use(express.static(__dirname));
 
-// ルートアクセス時に index.html を返す
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// 例：APIの代替として、ローカルで処理したいルート
-app.post('/api/local-process', (req, res) => {
-  const input = req.body.text;
-  // 仮の処理：受け取った文字列を大文字にして返す
-  res.json({ result: input.toUpperCase() });
+// remove-bg.htmlへのルートも対応
+app.get('/remove-bg.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'remove-bg.html'));
 });
 
 app.listen(port, () => {
