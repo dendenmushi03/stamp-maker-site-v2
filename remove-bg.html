@@ -24,11 +24,14 @@
       flex-direction: column;
       align-items: center;
     }
-    img, canvas {
+    img {
       max-width: 300px;
       height: auto;
       border: 1px solid #ccc;
       background-color: white;
+    }
+    canvas {
+      display: none;
     }
   </style>
 </head>
@@ -42,14 +45,17 @@
       <img id="originalImage" src="" alt="元画像が表示されます">
     </div>
     <div class="preview-box">
-      <p>人物のみ</p>
-      <canvas id="canvas"></canvas>
+      <p>人物のみ（長押しで保存可）</p>
+      <img id="outputImage" src="" alt="人物のみ画像">
     </div>
   </div>
+
+  <canvas id="canvas"></canvas>
 
   <script>
     const upload = document.getElementById('upload');
     const originalImage = document.getElementById('originalImage');
+    const outputImage = document.getElementById('outputImage');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -79,13 +85,17 @@
 
         for (let i = 0; i < pixels.length / 4; i++) {
           if (segmentation.data[i] === 0) {
-            pixels[i * 4 + 3] = 0; // 背景ピクセルを透明化
+            pixels[i * 4 + 3] = 0; // 透明化
           }
         }
 
         ctx.putImageData(imageData, 0, 0);
+
+        // canvasをimgに変換して出力
+        outputImage.src = canvas.toDataURL('image/png');
       };
-      img.src = URL.createObjectURL(file);
+
+      img.src = URL.createObjectURL(file); // onload前に設定（これはOK）
     });
 
     loadModel();
