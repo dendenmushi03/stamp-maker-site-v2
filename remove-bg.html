@@ -2,62 +2,88 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>背景除去（人物のみ）</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
+  <title>背景除去ツール（人物のみ切り抜き）</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1"></script>
   <style>
     body {
       font-family: sans-serif;
       text-align: center;
-      background-color: #f0f0f0;
-      padding: 20px;
+      background-color: #f4f4f4;
+      padding: 30px;
     }
-    canvas, img {
-      max-width: 100%;
-      margin-top: 10px;
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .preview-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    img, canvas {
+      max-width: 300px;
+      height: auto;
+      border: 1px solid #ccc;
+      background-color: white;
     }
   </style>
 </head>
 <body>
-  <h2>背景除去ツール（人物のみ切り抜き）</h2>
-  <input type="file" accept="image/*" id="imageUpload"><br>
-  <canvas id="outputCanvas"></canvas>
+  <h1>背景除去ツール（人物のみ切り抜き）</h1>
+  <input type="file" id="upload" accept="image/*"><br>
+
+  <div class="container">
+    <div class="preview-box">
+      <p>元画像</p>
+      <img id="originalImage" src="" alt="元画像が表示されます">
+    </div>
+    <div class="preview-box">
+      <p>人物のみ</p>
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
 
   <script>
-    const imageUpload = document.getElementById("imageUpload");
-    const canvas = document.getElementById("outputCanvas");
-    const ctx = canvas.getContext("2d");
+    const upload = document.getElementById('upload');
+    const originalImage = document.getElementById('originalImage');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-    let net;
+    let net = null;
 
     async function loadModel() {
       net = await bodyPix.load();
+      console.log("モデル読み込み完了");
     }
 
-    imageUpload.addEventListener("change", async () => {
-      const file = imageUpload.files[0];
-      if (!file) return;
+    upload.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file || !net) return;
 
       const img = new Image();
       img.onload = async () => {
+        originalImage.src = img.src;
+
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
 
-        // 推論実行
-        const segmentation = await net.segmentPerson(img, {
-          internalResolution: 'medium',
-          segmentationThreshold: 0.7,
-        });
+        const segmentation = await net.segmentPerson(img);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
 
-        // 背景除去用マスク作成
-        const maskBackground = true;
-        const foregroundColor = { r: 0, g: 0, b: 0, a: 0 };
-        const backgroundColor = { r: 0, g: 0, b: 0, a: 255 };
-        const mask = bodyPix.toMask(segmentation, foregroundColor, backgroundColor);
+        for (let i = 0; i < pixels.length / 4; i++) {
+          if (segmentation.data[i] === 0) {
+            pixels[i * 4 + 3] = 0; // 背景ピクセルを透明化
+          }
+        }
 
-        // マスク適用して描画
-        bodyPix.drawMask(canvas, img, mask, 1, 0, false);
+        ctx.putImageData(imageData, 0, 0);
       };
       img.src = URL.createObjectURL(file);
     });
