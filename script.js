@@ -193,10 +193,29 @@ function renderCanvas() {
       drawPointer(el);
     }
 
+        if (el === selectedElement && el.type === "bubble") {
+      ctx.fillStyle = "blue";
+      ctx.fillRect(el.x + el.w - 5, el.y + el.h - 5, 10, 10);
+      const p = getPointerPos(el);
+      ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
+    }
+
+
     if (el.type === "text") {
       ctx.font = `${el.size || 24}px ${el.font}`;
       ctx.fillStyle = el.color;
       ctx.fillText(el.text, el.x, el.y);
+
+          if (el === selectedElement && el.type === "text") {
+      const width = ctx.measureText(el.text).width;
+      const height = el.size || 24;
+      ctx.setLineDash([5, 3]);
+      ctx.strokeStyle = "black";
+      ctx.strokeRect(el.x, el.y - height + 4, width, height);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "blue";
+      ctx.fillRect(el.x + width - 5, el.y - height - 5, 10, 10);
+    }
     }
   }
 }
