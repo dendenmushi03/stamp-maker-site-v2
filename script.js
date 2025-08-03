@@ -70,6 +70,14 @@ document.getElementById("addText").addEventListener("click", () => {
   }
 });
 
+document.getElementById("resetImagePosition").addEventListener("click", () => {
+  if (baseImage) {
+    imageX = 0;
+    imageY = 0;
+    renderCanvas();
+  }
+});
+
 document.getElementById("deleteSelected").addEventListener("click", () => {
   if (selectedElement !== null) {
     elements.splice(elements.indexOf(selectedElement), 1);
