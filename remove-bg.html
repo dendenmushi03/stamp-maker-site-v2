@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>背景除去（人物のみ）</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background-color: #f0f0f0;
+      padding: 20px;
+    }
+    canvas, img {
+      max-width: 100%;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>背景除去ツール（人物のみ切り抜き）</h2>
+  <input type="file" accept="image/*" id="imageUpload"><br>
+  <canvas id="outputCanvas"></canvas>
+
+  <script>
+    const imageUpload = document.getElementById("imageUpload");
+    const canvas = document.getElementById("outputCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let net;
+
+    async function loadModel() {
+      net = await bodyPix.load();
+    }
+
+    imageUpload.addEventListener("change", async () => {
+      const file = imageUpload.files[0];
+      if (!file) return;
+
+      const img = new Image();
+      img.onload = async () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 推論実行
+        const segmentation = await net.segmentPerson(img, {
+          internalResolution: 'medium',
+          segmentationThreshold: 0.7,
+        });
+
+        // 背景除去用マスク作成
+        const maskBackground = true;
+        const foregroundColor = { r: 0, g: 0, b: 0, a: 0 };
+        const backgroundColor = { r: 0, g: 0, b: 0, a: 255 };
+        const mask = bodyPix.toMask(segmentation, foregroundColor, backgroundColor);
+
+        // マスク適用して描画
+        bodyPix.drawMask(canvas, img, mask, 1, 0, false);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    loadModel();
+  </script>
+</body>
+</html>
