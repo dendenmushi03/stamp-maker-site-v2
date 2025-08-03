@@ -1,0 +1,320 @@
+body {
+  font-family: "Noto Sans JP", sans-serif;
+  background: linear-gradient(to bottom right, #f5f7fa, #c3cfe2);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+h1 {
+  margin-top: 30px;
+  font-size: 32px;
+  color: #2c3e50;
+}
+
+.container {
+  background-color: white;
+  padding: 30px;
+  margin: 30px 0;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 520px;
+  text-align: center;
+}
+
+canvas {
+  background-color: white;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  max-width: 100%;
+  border: 1px solid #ccc;
+}
+
+label {
+  display: inline-block;
+  margin: 10px 5px;
+  font-weight: bold;
+}
+
+input[type="text"],
+select {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 6px;
+  border: 1px solid #bbb;
+  width: 250px;
+  font-size: 14px;
+}
+
+input[type="color"] {
+  width: 40px;
+  height: 40px;
+  border: none;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+
+button {
+  padding: 10px 18px;
+  margin: 10px 6px;
+  border-radius: 8px;
+  border: none;
+  background-color: #4a90e2;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background-color: #357ab8;
+}
+
+button:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
+}
+
+/* ロゴ画像 */
+.logo {
+  height: 50px;
+  margin-bottom: 0;
+}
+
+.logo-header {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.logo-image {
+  max-width: 220px;
+  height: auto;
+}
+
+/* SNSシェア（通常画面） */
+.sns-share {
+  text-align: center;
+  margin-top: 30px;
+}
+
+.sns-share p {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.sns-icon img {
+  width: 40px;
+  height: 40px;
+  margin: 0 10px;
+  vertical-align: middle;
+  transition: transform 0.2s ease;
+}
+
+.sns-icon img:hover {
+  transform: scale(1.15);
+}
+
+/* ===================
+   モーダルスタイル
+=================== */
+.modal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 30px 20px;
+  border-radius: 12px;
+  text-align: center;
+  width: 90%;
+  max-width: 380px;
+  position: relative;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.modal-image {
+  max-width: 100%;
+  margin: 20px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.modal-share p {
+  margin-top: 20px;
+  font-weight: bold;
+}
+
+.modal-share a img {
+  width: 40px;
+  height: 40px;
+  margin: 0 10px;
+  vertical-align: middle;
+  transition: transform 0.2s ease;
+}
+
+.modal-share a img:hover {
+  transform: scale(1.1);
+}
+
+/* 閉じるボタン */
+.close-btn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 24px;
+  color: #888;
+  cursor: pointer;
+}
+
+/* ===================
+   使い方ページ（howto.html）用スタイル
+=================== */
+section {
+  text-align: left;
+  margin-bottom: 30px;
+}
+
+section h2 {
+  font-size: 20px;
+  color: #34495e;
+  margin-bottom: 10px;
+  border-left: 5px solid #4a90e2;
+  padding-left: 10px;
+}
+
+section p {
+  font-size: 15px;
+  color: #555;
+  margin: 0;
+  line-height: 1.7;
+}
+
+.howto-image {
+  display: block;
+  margin: 20px auto; /* 上下に20pxの余白、左右は自動で中央寄せ */
+  max-width: 100%;
+  height: auto;
+}
+
+.divider-line {
+  margin: 20px auto 0;
+  width: 95%;
+  max-width: 640px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #4a90e2, #2c3e50);
+}
+
+.howto-button-wrapper {
+  text-align: center;
+  margin: 20px 0 10px;
+}
+
+.howto-button {
+  display: inline-block;
+  padding: 10px 24px;
+  background-color: #4a90e2;
+  color: white;
+  border-radius: 8px;
+  font-weight: bold;
+  text-decoration: none;
+  font-size: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.howto-button:hover {
+  background-color: #357ab8;
+  transform: scale(1.05);
+}
+
+.section-title-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 40px 0 20px;
+}
+
+.section-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 12px 0;
+  position: relative;
+}
+
+.title-line {
+  width: 380px;
+  height: 4px;
+  background: linear-gradient(to right, #4a90e2, #2c3e50);
+  border-radius: 2px;
+}
+
+/* ===================
+   モバイル対応（モーダル最適化）
+=================== */
+@media (max-width: 600px) {
+  .modal-content {
+    width: 70%;
+    max-width: 240px;
+    padding: 16px;
+  }
+
+  .modal-content h2 {
+    font-size: 1.2rem;
+  }
+
+  .modal-image {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    margin: 10px 0;
+  }
+
+  .modal-share {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .modal-share p {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .modal-share a img {
+    width: 36px;
+    height: 36px;
+    margin: 6px;
+  }
+}
+
+#bubbleColor {
+  border: 2px solid #000; /* 黒枠 */
+  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  appearance: none; /* 一部ブラウザで余計なUIを排除 */
+}

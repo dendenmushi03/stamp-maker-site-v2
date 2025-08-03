@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>スタンプメーカー</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+<body>
+  <div class="container">
+    <div class="logo-header">
+      <img src="assets/stamp-logo.png" alt="Stamp Maker ロゴ" class="logo-image">
+    </div>
+
+    <div class="divider-line"></div>
+
+    <div class="howto-button-wrapper">
+      <a href="howto.html" class="howto-button">使い方ガイド</a>
+    </div>
+
+    <div class="section-title-wrapper">
+      <div class="title-line"></div>
+      <h2 class="section-title">スタンプ作成ページ</h2>
+      <div class="title-line"></div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="editorCanvas" width="300" height="300"></canvas>
+    </div>
+
+    <div class="form-group">
+      <h3>ステップ①：ベース画像を選択</h3>
+      <input type="file" id="imageUpload" accept="image/*">
+      <button id="resetImagePosition">初期位置に戻す</button>
+    </div>
+
+    <div class="form-group">
+      <h3>ステップ②：吹き出しの設置</h3>
+      <input type="color" id="bubbleColor" value="#ffffff">
+      <button id="addBubble" class="btn btn-secondary">吹き出し追加</button>
+    </div>
+
+    <div class="form-group">
+      <h3>ステップ③：テキストの設置</h3>
+      <input type="text" id="textInput" placeholder="例: OK！">
+    </div>
+
+    <div class="form-group">
+      <label for="fontSelect">フォント:</label>
+      <select id="fontSelect">
+        <option value="sans-serif">ゴシック</option>
+        <option value="serif">明朝体</option>
+        <option value="cursive">手書き風</option>
+      </select>
+      <input type="color" id="textColor" value="#000000">
+      <button id="addText" class="btn btn-secondary">テキスト追加</button>
+    </div>
+
+    <div class="form-group button-group">
+      <h3>ステップ④：完成</h3>
+      <button id="saveImage" class="btn btn-primary">画像を保存</button>
+      <button id="deleteSelected" class="btn btn-danger">選択中の要素を削除</button>
+    </div>
+
+    <a href="/remove-bg.html">背景を削除したい方はこちら</a>
+
+    <!-- ▼ モーダル（画像保存後に表示） -->
+    <div id="saveModal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-btn" id="closeModal">&times;</span>
+        <h3>⚠️画像はまだ保存できていません</h3>
+        <h3>画像を長押しして保存を完了してください！</h3>
+
+        <!-- 画像クリックで別タブ表示 -->
+        <img id="savedImagePreview" src="" alt="保存画像" class="modal-image" crossorigin="anonymous" style="touch-action: auto; cursor: pointer;">
+
+        <div class="modal-share">
+          <p>このスタンプをシェアする:</p>
+          <a id="modalShareX" target="_blank"><img src="assets/icon-x.png" alt="X"></a>
+          <a id="modalShareLINE" target="_blank"><img src="assets/icon-line.png" alt="LINE"></a>
+          <a id="modalShareInsta" target="_blank"><img src="assets/icon-instagram.png" alt="Instagram"></a>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </div>
+</body>
+</html>
