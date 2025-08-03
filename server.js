@@ -1,67 +1,26 @@
-// --- server.js ---
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const fetch = require("node-fetch");
-const path = require("path");
-
-dotenv.config();
+const express = require('express');
+const path = require('path');
+const cors = require('cors');
 
 const app = express();
+const port = process.env.PORT || 3000;
+
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json());
 app.use(express.static(__dirname));
 
-// --- 背景除去APIルート ---
-app.post("/api/remove-background", async (req, res) => {
-  try {
-    const { imageUrl } = req.body;
-
-    const response = await fetch("https://api.replicate.com/v1/predictions", {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        version:
-          "d2e6715d62db8ef8c13864d7c3cfcaa2196e0a6ff1b65cbe8d2f97c1cd3f1fa6",
-        input: {
-          image: imageUrl,
-        },
-      }),
-    });
-
-    const prediction = await response.json();
-
-    // polling処理（完了まで待つ）
-    const poll = async () => {
-      const pollRes = await fetch(
-        `https://api.replicate.com/v1/predictions/${prediction.id}`,
-        {
-          headers: {
-            Authorization: `Token ${process.env.REPLICATE_API_TOKEN}`,
-          },
-        }
-      );
-      const result = await pollRes.json();
-      if (result.status === "succeeded") {
-        return res.json({ imageUrl: result.output });
-      } else if (result.status === "failed") {
-        return res.status(500).json({ error: "Background removal failed" });
-      } else {
-        setTimeout(() => poll(), 2000); // 修正：async-await再帰ではなくコールバック式
-      }
-    };
-    poll();
-  } catch (error) {
-    console.error("Error removing background:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+// ルートアクセス時に index.html を返す
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- サーバー起動 ---
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// 例：APIの代替として、ローカルで処理したいルート
+app.post('/api/local-process', (req, res) => {
+  const input = req.body.text;
+  // 仮の処理：受け取った文字列を大文字にして返す
+  res.json({ result: input.toUpperCase() });
+});
+
+app.listen(port, () => {
+  console.log(`Server is running at http://localhost:${port}`);
 });
