@@ -16,6 +16,7 @@ upload.addEventListener('change', async (e) => {
   if (!file || !net) return;
 
   const img = new Image();
+  img.crossOrigin = "anonymous";  // ←これが重要
   img.onload = async () => {
     originalImage.src = img.src;
 
@@ -30,7 +31,7 @@ upload.addEventListener('change', async (e) => {
 
     for (let i = 0; i < pixels.length / 4; i++) {
       if (segmentation.data[i] === 0) {
-        pixels[i * 4 + 3] = 0; // 背景部分を透明に
+        pixels[i * 4 + 3] = 0; // 背景を透明に
       }
     }
 
@@ -38,7 +39,7 @@ upload.addEventListener('change', async (e) => {
     outputImage.src = canvas.toDataURL('image/png');
   };
 
-  img.src = URL.createObjectURL(file);
+  img.src = URL.createObjectURL(file); // srcは最後でOK
 });
 
 loadModel();
