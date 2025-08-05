@@ -381,12 +381,30 @@ function onMouseUp() {
 }
 
 function getPointerPos(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset } = el;
-  switch (pointerPosition) {
-    case "top": return { x: x + w * pointerOffset, y: y };
-    case "bottom": return { x: x + w * pointerOffset, y: y + h };
-    case "left": return { x: x, y: y + h * pointerOffset };
-    case "right": return { x: x + w, y: y + h * pointerOffset };
+  const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
+  if (shape === "oval") {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const rx = w / 2;
+    const ry = h / 2;
+    let angle = 0;
+    switch (pointerPosition) {
+      case "top": angle = -Math.PI / 2; break;
+      case "bottom": angle = Math.PI / 2; break;
+      case "left": angle = Math.PI; break;
+      case "right": angle = 0; break;
+    }
+    return {
+      x: cx + rx * Math.cos(angle),
+      y: cy + ry * Math.sin(angle)
+    };
+  } else {
+    switch (pointerPosition) {
+      case "top": return { x: x + w * pointerOffset, y: y };
+      case "bottom": return { x: x + w * pointerOffset, y: y + h };
+      case "left": return { x: x, y: y + h * pointerOffset };
+      case "right": return { x: x + w, y: y + h * pointerOffset };
+    }
   }
 }
 
