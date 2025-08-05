@@ -151,36 +151,23 @@ function drawThoughtDots(ctx, x, y) {
 }
 
 function drawPointer(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, fill } = el;
-  const size = 15;
-  ctx.fillStyle = fill;
+  const p = getPointerPos(el);
+  const size = 10;
+  const baseAngle = p.angle ?? 0;
+  const angleA = baseAngle - Math.PI / 12;
+  const angleB = baseAngle + Math.PI / 12;
+
+  const ax = p.x + size * Math.cos(angleA);
+  const ay = p.y + size * Math.sin(angleA);
+  const bx = p.x + size * Math.cos(angleB);
+  const by = p.y + size * Math.sin(angleB);
+
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "black";
   ctx.beginPath();
-  switch (pointerPosition) {
-    case "top":
-      const px1 = x + w * pointerOffset;
-      ctx.moveTo(px1 - size / 2, y);
-      ctx.lineTo(px1, y - size);
-      ctx.lineTo(px1 + size / 2, y);
-      break;
-    case "bottom":
-      const px2 = x + w * pointerOffset;
-      ctx.moveTo(px2 - size / 2, y + h);
-      ctx.lineTo(px2, y + h + size);
-      ctx.lineTo(px2 + size / 2, y + h);
-      break;
-    case "left":
-      const py1 = y + h * pointerOffset;
-      ctx.moveTo(x, py1 - size / 2);
-      ctx.lineTo(x - size, py1);
-      ctx.lineTo(x, py1 + size / 2);
-      break;
-    case "right":
-      const py2 = y + h * pointerOffset;
-      ctx.moveTo(x + w, py2 - size / 2);
-      ctx.lineTo(x + w + size, py2);
-      ctx.lineTo(x + w, py2 + size / 2);
-      break;
-  }
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(p.x, p.y);
+  ctx.lineTo(bx, by);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -381,29 +368,32 @@ function onMouseUp() {
 }
 
 function getPointerPos(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
-  if (shape === "oval") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = 0;
-    switch (pointerPosition) {
-      case "top": angle = -Math.PI / 2; break;
-      case "bottom": angle = Math.PI / 2; break;
-      case "left": angle = Math.PI; break;
-      case "right": angle = 0; break;
-    }
+  if (el.shape === "oval") {
+    const angle = (el.pointerOffset ?? 0) * 2 * Math.PI;
+    const rx = el.w / 2;
+    const ry = el.h / 2;
+    const cx = el.x + rx;
+    const cy = el.y + ry;
     return {
       x: cx + rx * Math.cos(angle),
-      y: cy + ry * Math.sin(angle)
+      y: cy + ry * Math.sin(angle),
+      angle: angle,
     };
   } else {
-    switch (pointerPosition) {
-      case "top": return { x: x + w * pointerOffset, y: y };
-      case "bottom": return { x: x + w * pointerOffset, y: y + h };
-      case "left": return { x: x, y: y + h * pointerOffset };
-      case "right": return { x: x + w, y: y + h * pointerOffset };
+    // 四角形対応（従来通り）
+    const offset = el.pointerOffset || "bottom";
+    const margin = 10;
+    switch (offset) {
+      case "top":
+        return { x: el.x + el.w / 2, y: el.y - margin };
+      case "bottom":
+        return { x: el.x + el.w / 2, y: el.y + el.h + margin };
+      case "left":
+        return { x: el.x - margin, y: el.y + el.h / 2 };
+      case "right":
+        return { x: el.x + el.w + margin, y: el.y + el.h / 2 };
+      default:
+        return { x: el.x + el.w / 2, y: el.y + el.h + margin };
     }
   }
 }
