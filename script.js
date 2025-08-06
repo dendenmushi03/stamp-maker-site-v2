@@ -2,7 +2,6 @@ const canvas = document.getElementById("editorCanvas");
 const ctx = canvas.getContext("2d");
 let elements = [];
 let selectedElement = null;
-
 let resizeStartY = null;
 let initialFontSize = null;
 let baseImage = null;
@@ -86,6 +85,69 @@ document.getElementById("deleteSelected").addEventListener("click", () => {
   }
 });
 
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (backgroundImage) {
+    const drawWidth = backgroundImage.width * imageScale;
+    const drawHeight = backgroundImage.height * imageScale;
+    ctx.drawImage(backgroundImage, imageX, imageY, drawWidth, drawHeight);
+  }
+  for (const el of elements) {
+    if (el.type === 'bubble') drawBubble(el);
+    if (el.type === 'text') drawText(el);
+  }
+}
+
+function drawBubble(el) {
+  ctx.save();
+  ctx.translate(el.x, el.y);
+  ctx.beginPath();
+  if (el.shape === '角丸') {
+    const r = 10;
+    ctx.moveTo(el.width - r, 0);
+    ctx.arcTo(el.width, 0, el.width, r, r);
+    ctx.arcTo(el.width, el.height, el.width - r, el.height, r);
+    ctx.arcTo(0, el.height, 0, el.height - r, r);
+    ctx.arcTo(0, 0, r, 0, r);
+  } else if (el.shape === '楕円') {
+    ctx.ellipse(el.width / 2, el.height / 2, el.width / 2, el.height / 2, 0, 0, Math.PI * 2);
+  } else if (el.shape === '雲') {
+    for (let i = 0; i < 5; i++) {
+      ctx.arc(el.width / 5 * i + 15, el.height / 2, 15, 0, Math.PI * 2);
+    }
+  } else {
+    ctx.rect(0, 0, el.width, el.height);
+  }
+  ctx.closePath();
+  ctx.fillStyle = el.color;
+  ctx.fill();
+  ctx.strokeStyle = "black";
+  ctx.stroke();
+
+  // ポインタ（ツノ）
+  const angle = el.pointerAngle;
+  const px = el.width / 2 + Math.cos(angle) * el.width / 2;
+  const py = el.height / 2 + Math.sin(angle) * el.height / 2;
+  const size = 10;
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(px - size * Math.cos(angle - 0.5), py - size * Math.sin(angle - 0.5));
+  ctx.lineTo(px - size * Math.cos(angle + 0.5), py - size * Math.sin(angle + 0.5));
+  ctx.closePath();
+  ctx.fillStyle = "white";
+  ctx.fill();
+  ctx.stroke();
+
+  // オレンジハンドル
+  ctx.beginPath();
+  ctx.arc(px, py, 5, 0, Math.PI * 2);
+  ctx.fillStyle = "orange";
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function drawBubbleShape(el, ctx) {
   const { x, y, w, h, shape } = el;
   ctx.beginPath();
@@ -148,6 +210,68 @@ function drawThoughtDots(ctx, x, y) {
   ctx.arc(x + 5, y + 5, 5, 0, 2 * Math.PI);
   ctx.moveTo(x + 15, y + 15);
   ctx.arc(x + 15, y + 15, 3, 0, 2 * Math.PI);
+}
+
+function drawPointer(el) {
+  const { x, y, w, h, pointerPosition, pointerOffset, fill, shape } = el;
+  const size = 15;
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+
+  if (shape === "oval" || shape === "thought2") {
+    // 楕円など：外周に吸着
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const rx = w / 2;
+    const ry = h / 2;
+    let angle = 0;
+    switch (pointerPosition) {
+      case "top": angle = -Math.PI / 2; break;
+      case "bottom": angle = Math.PI / 2; break;
+      case "left": angle = Math.PI; break;
+      case "right": angle = 0; break;
+    }
+
+    const baseX = cx + rx * Math.cos(angle);
+    const baseY = cy + ry * Math.sin(angle);
+    const angle1 = angle - Math.PI / 12;
+    const angle2 = angle + Math.PI / 12;
+    ctx.moveTo(baseX, baseY);
+    ctx.lineTo(cx + (rx + size) * Math.cos(angle1), cy + (ry + size) * Math.sin(angle1));
+    ctx.lineTo(cx + (rx + size) * Math.cos(angle2), cy + (ry + size) * Math.sin(angle2));
+  } else {
+    // 通常四角・角丸など
+    switch (pointerPosition) {
+      case "top":
+        const px1 = x + w * pointerOffset;
+        ctx.moveTo(px1 - size / 2, y);
+        ctx.lineTo(px1, y - size);
+        ctx.lineTo(px1 + size / 2, y);
+        break;
+      case "bottom":
+        const px2 = x + w * pointerOffset;
+        ctx.moveTo(px2 - size / 2, y + h);
+        ctx.lineTo(px2, y + h + size);
+        ctx.lineTo(px2 + size / 2, y + h);
+        break;
+      case "left":
+        const py1 = y + h * pointerOffset;
+        ctx.moveTo(x, py1 - size / 2);
+        ctx.lineTo(x - size, py1);
+        ctx.lineTo(x, py1 + size / 2);
+        break;
+      case "right":
+        const py2 = y + h * pointerOffset;
+        ctx.moveTo(x + w, py2 - size / 2);
+        ctx.lineTo(x + w + size, py2);
+        ctx.lineTo(x + w, py2 + size / 2);
+        break;
+    }
+  }
+
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
 }
 
 function getPointerPos(el) {
@@ -377,6 +501,17 @@ function onMouseUp() {
   initialFontSize = null;
 }
 
+function getElementAt(x, y) {
+  return elements.find(el => {
+    return (
+      x > el.x &&
+      y > el.y &&
+      x < el.x + el.width &&
+      y < el.y + el.height
+    );
+  });
+}
+
 function getPointerPos(el) {
   const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
   if (shape === "oval") {
@@ -450,6 +585,15 @@ document.getElementById("saveImage").addEventListener("click", () => {
 
   document.getElementById("saveModal").style.display = "flex";
 });
+
+function drawText(el) {
+  ctx.save();
+  ctx.translate(el.x, el.y);
+  ctx.font = `${el.size}px ${el.font}`;
+  ctx.fillStyle = el.color;
+  ctx.fillText(el.text, 0, el.size);
+  ctx.restore();
+}
 
 function drawPointerToContext(ctx, el) {
   const { x, y, w, h, pointerPosition, pointerOffset } = el;
