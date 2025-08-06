@@ -153,7 +153,7 @@ function drawBubbleShape(el, ctx) {
   ctx.beginPath();
   switch (shape) {
     case "oval":
-      ctx.ellipse(x, y, w, h, 15);
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
       break;
     case "rounded":
       ctx.roundRect(x, y, w, h, 15);
