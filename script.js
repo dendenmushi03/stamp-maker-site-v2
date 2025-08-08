@@ -156,11 +156,11 @@ function buildRoundedWithPointerPath(el) {
   const { x, y, w, h, pointerPosition, pointerOffset } = el;
 
   // 角丸半径・ツノサイズ（パワポ寄せの比率）
-  const r  = Math.min(18, Math.max(6, Math.min(w, h) * 0.12));
-  const bw = Math.min(w, h) * 0.16;     // ツノの基部幅
-  const bl = bw * 0.90;                 // ツノの長さ
-  const bw  = bw0 * pointerScale;       // ← スライダー反映
-  const bl  = bl0 * pointerScale;       // ← スライダー反映
+  const r   = Math.min(18, Math.max(6, Math.min(w, h) * 0.12));
+  const bw0 = Math.min(w, h) * 0.16;     // ツノの基部幅(基準)
+  const bl0 = bw0 * 0.90;                // ツノの長さ(基準)
+  const bw  = bw0 * pointerScale;        // スライダー反映
+  const bl  = bl0 * pointerScale;        // スライダー反映
 
   // ストロークのにじみ防止（0.5px に寄せる）
   const L = Math.round(x) + 0.5;
