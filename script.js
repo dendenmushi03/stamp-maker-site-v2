@@ -260,6 +260,7 @@ function getPointerPos(el) {
 // ====== render ======
 function renderCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  elements = elements.filter(el => el.type === "bubble" || el.type === "text");
   if (baseImage) ctx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
 
   for (const el of elements) {
@@ -291,6 +292,7 @@ function renderCanvas() {
         // ツノハンドル（接点）
         const p = getPointerPos(el);
         ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
+         if ((el.text || "").length > 0) { 
         // テキストのガイド
         const w = ctx.measureText(el.text || "").width;
         const h = el.size || 24;
