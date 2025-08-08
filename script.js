@@ -85,6 +85,69 @@ document.getElementById("deleteSelected").addEventListener("click", () => {
   }
 });
 
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (backgroundImage) {
+    const drawWidth = backgroundImage.width * imageScale;
+    const drawHeight = backgroundImage.height * imageScale;
+    ctx.drawImage(backgroundImage, imageX, imageY, drawWidth, drawHeight);
+  }
+  for (const el of elements) {
+    if (el.type === 'bubble') drawBubble(el);
+    if (el.type === 'text') drawText(el);
+  }
+}
+
+function drawBubble(el) {
+  ctx.save();
+  ctx.translate(el.x, el.y);
+  ctx.beginPath();
+  if (el.shape === '角丸') {
+    const r = 10;
+    ctx.moveTo(el.width - r, 0);
+    ctx.arcTo(el.width, 0, el.width, r, r);
+    ctx.arcTo(el.width, el.height, el.width - r, el.height, r);
+    ctx.arcTo(0, el.height, 0, el.height - r, r);
+    ctx.arcTo(0, 0, r, 0, r);
+  } else if (el.shape === '楕円') {
+    ctx.ellipse(el.width / 2, el.height / 2, el.width / 2, el.height / 2, 0, 0, Math.PI * 2);
+  } else if (el.shape === '雲') {
+    for (let i = 0; i < 5; i++) {
+      ctx.arc(el.width / 5 * i + 15, el.height / 2, 15, 0, Math.PI * 2);
+    }
+  } else {
+    ctx.rect(0, 0, el.width, el.height);
+  }
+  ctx.closePath();
+  ctx.fillStyle = el.color;
+  ctx.fill();
+  ctx.strokeStyle = "black";
+  ctx.stroke();
+
+  // ポインタ（ツノ）
+  const angle = el.pointerAngle;
+  const px = el.width / 2 + Math.cos(angle) * el.width / 2;
+  const py = el.height / 2 + Math.sin(angle) * el.height / 2;
+  const size = 10;
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(px - size * Math.cos(angle - 0.5), py - size * Math.sin(angle - 0.5));
+  ctx.lineTo(px - size * Math.cos(angle + 0.5), py - size * Math.sin(angle + 0.5));
+  ctx.closePath();
+  ctx.fillStyle = "white";
+  ctx.fill();
+  ctx.stroke();
+
+  // オレンジハンドル
+  ctx.beginPath();
+  ctx.arc(px, py, 5, 0, Math.PI * 2);
+  ctx.fillStyle = "orange";
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function drawBubbleShape(el, ctx) {
   const { x, y, w, h, shape } = el;
   ctx.beginPath();
@@ -541,6 +604,17 @@ function onMouseUp() {
   imageDragging = false;
   resizeStartY = null;
   initialFontSize = null;
+}
+
+function getElementAt(x, y) {
+  return elements.find(el => {
+    return (
+      x > el.x &&
+      y > el.y &&
+      x < el.x + el.width &&
+      y < el.y + el.height
+    );
+  });
 }
 
 function getPointerPos(el) {
