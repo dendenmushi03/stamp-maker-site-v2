@@ -226,7 +226,7 @@ function buildRoundedWithPointerPath(el) {
   path.lineTo(t2x, t2y);
   path.closePath();
 
-  return { path, strokeW: 1.5, radius: r };
+  return { path, strokeW: 2.0, radius: r };
 }
 
 // 汎用：rounded のときだけ一体パス、それ以外は null を返す
@@ -341,6 +341,10 @@ function renderCanvas() {
     // 一体パス（rounded 専用）
     const { path, strokeW } = built;
 
+    ctx.lineJoin = "round";
+    ctx.lineCap  = "round";
+    ctx.miterLimit = 2.5;
+
     // 塗りにだけ影を適用（パワポ風）
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.18)";
@@ -358,6 +362,11 @@ function renderCanvas() {
     ctx.fillStyle = el.fill;
     drawBubbleShape(el, ctx);
     ctx.fill();
+
+    ctx.lineJoin = "round";
+    ctx.lineCap  = "round";
+    ctx.miterLimit = 2.5;
+
     ctx.strokeStyle = "black";
     ctx.lineWidth = 1;
     ctx.stroke();
@@ -588,21 +597,34 @@ document.getElementById("saveImage").addEventListener("click", () => {
     const built = buildBubblePath(el);
     if (built) {
       const { path, strokeW } = built;
-      tempCtx.save();
-      tempCtx.shadowColor = "rgba(0,0,0,0.18)";
-      tempCtx.shadowBlur = 6;
-      tempCtx.shadowOffsetY = 1;
-      tempCtx.fillStyle = el.fill;
-      tempCtx.fill(path, "nonzero");
-      tempCtx.restore();
 
-      tempCtx.strokeStyle = "black";
-      tempCtx.lineWidth = strokeW;
-      tempCtx.stroke(path);
+// ★追加：線の質感
+tempCtx.lineJoin = "round";
+tempCtx.lineCap  = "round";
+tempCtx.miterLimit = 2.5;
+
+// 影（出力も少し強めに合わせる）
+tempCtx.save();
+tempCtx.shadowColor = "rgba(0,0,0,0.22)";
+tempCtx.shadowBlur = 7;
+tempCtx.shadowOffsetY = 2;
+tempCtx.fillStyle = el.fill;
+tempCtx.fill(path, "nonzero");
+tempCtx.restore();
+
+tempCtx.strokeStyle = "black";
+tempCtx.lineWidth = strokeW;
+tempCtx.stroke(path);
+
     } else {
       tempCtx.fillStyle = el.fill;
       drawBubbleShape(el, tempCtx);
       tempCtx.fill();
+
+      tempCtx.lineJoin = "round";
+tempCtx.lineCap  = "round";
+tempCtx.miterLimit = 2.5;
+
       tempCtx.strokeStyle = "black";
       tempCtx.lineWidth = 1;
       tempCtx.stroke();
