@@ -1,7 +1,9 @@
+// === script.js (ステップ1：オレンジハンドル＋外周吸着・角度ドラッグ対応) ===
 const canvas = document.getElementById("editorCanvas");
 const ctx = canvas.getContext("2d");
 let elements = [];
 let selectedElement = null;
+
 let resizeStartY = null;
 let initialFontSize = null;
 let baseImage = null;
@@ -34,17 +36,18 @@ document.getElementById("addBubble").addEventListener("click", () => {
   const selectedShape = bubbleShapeSelect?.value || "rounded";
   elements.push({
     type: "bubble",
-    shape: selectedShape,
+    shape: selectedShape,      // "rounded" | "oval" | "spike1" | "spike2" | "thought1" | "thought2"
     x: 50,
     y: 50,
     w: 150,
     h: 100,
-    pointerPosition: "bottom",
-    pointerOffset: 0.5,
     fill: "#ffffff",
+    // PowerPoint風ツノ制御（角度で吸着）
+    pointerAngle: -Math.PI / 2,   // 初期は上向き
+    handleDragging: false,
+    // 既存フラグ（互換維持）
     dragging: false,
     resizing: false,
-    draggingPointer: false,
   });
   renderCanvas();
 });
@@ -85,227 +88,173 @@ document.getElementById("deleteSelected").addEventListener("click", () => {
   }
 });
 
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (backgroundImage) {
-    const drawWidth = backgroundImage.width * imageScale;
-    const drawHeight = backgroundImage.height * imageScale;
-    ctx.drawImage(backgroundImage, imageX, imageY, drawWidth, drawHeight);
-  }
-  for (const el of elements) {
-    if (el.type === 'bubble') drawBubble(el);
-    if (el.type === 'text') drawText(el);
-  }
-}
-
-function drawBubble(el) {
-  ctx.save();
-  ctx.translate(el.x, el.y);
-  ctx.beginPath();
-  if (el.shape === '角丸') {
-    const r = 10;
-    ctx.moveTo(el.width - r, 0);
-    ctx.arcTo(el.width, 0, el.width, r, r);
-    ctx.arcTo(el.width, el.height, el.width - r, el.height, r);
-    ctx.arcTo(0, el.height, 0, el.height - r, r);
-    ctx.arcTo(0, 0, r, 0, r);
-  } else if (el.shape === '楕円') {
-    ctx.ellipse(el.width / 2, el.height / 2, el.width / 2, el.height / 2, 0, 0, Math.PI * 2);
-  } else if (el.shape === '雲') {
-    for (let i = 0; i < 5; i++) {
-      ctx.arc(el.width / 5 * i + 15, el.height / 2, 15, 0, Math.PI * 2);
-    }
-  } else {
-    ctx.rect(0, 0, el.width, el.height);
-  }
-  ctx.closePath();
-  ctx.fillStyle = el.color;
-  ctx.fill();
-  ctx.strokeStyle = "black";
-  ctx.stroke();
-
-  // ポインタ（ツノ）
-  const angle = el.pointerAngle;
-  const px = el.width / 2 + Math.cos(angle) * el.width / 2;
-  const py = el.height / 2 + Math.sin(angle) * el.height / 2;
-  const size = 10;
-  ctx.beginPath();
-  ctx.moveTo(px, py);
-  ctx.lineTo(px - size * Math.cos(angle - 0.5), py - size * Math.sin(angle - 0.5));
-  ctx.lineTo(px - size * Math.cos(angle + 0.5), py - size * Math.sin(angle + 0.5));
-  ctx.closePath();
-  ctx.fillStyle = "white";
-  ctx.fill();
-  ctx.stroke();
-
-  // オレンジハンドル
-  ctx.beginPath();
-  ctx.arc(px, py, 5, 0, Math.PI * 2);
-  ctx.fillStyle = "orange";
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawBubbleShape(el, ctx) {
+// ===== 図形描画 =====
+function drawBubbleShape(el, ctx2) {
   const { x, y, w, h, shape } = el;
-  ctx.beginPath();
+  ctx2.beginPath();
   switch (shape) {
     case "oval":
-      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
+      ctx2.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
       break;
     case "rounded":
-      ctx.roundRect(x, y, w, h, 15);
+      ctx2.roundRect ? ctx2.roundRect(x, y, w, h, 15) : roundedRectPath(ctx2, x, y, w, h, 15);
       break;
     case "spike1":
-      drawSpikeBubble(ctx, x, y, w, h, 10);
+      cloudOrSpikeApprox(ctx2, x, y, w, h, 10); // まずは近似（外周吸着は角度で処理）
       break;
     case "spike2":
-      drawSpikeBubble(ctx, x, y, w, h, 16);
+      cloudOrSpikeApprox(ctx2, x, y, w, h, 16);
       break;
     case "thought1":
-      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
-      drawThoughtDots(ctx, x + w, y + h);
+      ctx2.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
+      drawThoughtDots(ctx2, x + w, y + h);
       break;
     case "thought2":
-      drawCloudBubble(ctx, x, y, w, h);
-      drawThoughtDots(ctx, x + w, y + h);
+      drawCloudBubble(ctx2, x, y, w, h);
+      drawThoughtDots(ctx2, x + w, y + h);
       break;
     default:
-      ctx.roundRect(x, y, w, h, 15);
+      ctx2.roundRect ? ctx2.roundRect(x, y, w, h, 15) : roundedRectPath(ctx2, x, y, w, h, 15);
   }
-  ctx.closePath();
+  ctx2.closePath();
 }
 
-function drawSpikeBubble(ctx, x, y, w, h, spikes) {
+function roundedRectPath(c, x, y, w, h, r) {
+  const rr = Math.min(r, w/2, h/2);
+  c.beginPath();
+  c.moveTo(x + rr, y);
+  c.lineTo(x + w - rr, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + rr);
+  c.lineTo(x + w, y + h - rr);
+  c.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  c.lineTo(x + rr, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - rr);
+  c.lineTo(x, y + rr);
+  c.quadraticCurveTo(x, y, x + rr, y);
+}
+
+function cloudOrSpikeApprox(ctx2, x, y, w, h, spikes) {
+  // 見た目用の近似形。吸着自体は angle ベースなのでOK
   const cx = x + w / 2;
   const cy = y + h / 2;
-  const outerRadius = Math.min(w, h) / 2;
-  const innerRadius = outerRadius * 0.7;
+  const R = Math.min(w, h) / 2;
+  const r = R * 0.7;
   const step = Math.PI / spikes;
-  ctx.moveTo(cx + outerRadius, cy);
+  ctx2.moveTo(cx + R, cy);
   for (let i = 0; i < 2 * spikes; i++) {
-    const r = (i % 2 === 0) ? outerRadius : innerRadius;
-    const angle = i * step;
-    ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    const rad = (i % 2 === 0) ? R : r;
+    const ang = i * step;
+    ctx2.lineTo(cx + rad * Math.cos(ang), cy + rad * Math.sin(ang));
   }
-  ctx.closePath();
 }
 
-function drawCloudBubble(ctx, x, y, w, h) {
-  const r = 10;
-  const steps = 12;
+function drawCloudBubble(ctx2, x, y, w, h) {
+  const r = 10, steps = 12;
   for (let i = 0; i < steps; i++) {
     const angle = (i / steps) * 2 * Math.PI;
     const cx = x + w / 2 + (w / 2 - r) * Math.cos(angle);
     const cy = y + h / 2 + (h / 2 - r) * Math.sin(angle);
-    ctx.moveTo(cx + r, cy);
-    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx2.moveTo(cx + r, cy);
+    ctx2.arc(cx, cy, r, 0, 2 * Math.PI);
   }
 }
-
-function drawThoughtDots(ctx, x, y) {
-  ctx.moveTo(x, y);
-  ctx.arc(x + 5, y + 5, 5, 0, 2 * Math.PI);
-  ctx.moveTo(x + 15, y + 15);
-  ctx.arc(x + 15, y + 15, 3, 0, 2 * Math.PI);
+function drawThoughtDots(ctx2, x, y) {
+  ctx2.moveTo(x, y);
+  ctx2.arc(x + 5, y + 5, 5, 0, 2 * Math.PI);
+  ctx2.moveTo(x + 15, y + 15);
+  ctx2.arc(x + 15, y + 15, 3, 0, 2 * Math.PI);
 }
 
-function drawPointer(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, fill, shape } = el;
+// ===== ツノ（PowerPoint風：角度で外周吸着） =====
+function getAnchorPoint(el) {
+  const { x, y, w, h, shape, pointerAngle } = el;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+
+  if (shape === "oval" || shape === "thought1") {
+    // 楕円の外周上：角度に対するパラメトリック
+    const rx = w / 2, ry = h / 2;
+    return { x: cx + rx * Math.cos(pointerAngle), y: cy + ry * Math.sin(pointerAngle) };
+  }
+
+  // 角丸やその他はまず矩形として側を選ぶ（ステップ2で角丸補正予定）
+  const dx = Math.cos(pointerAngle);
+  const dy = Math.sin(pointerAngle);
+
+  // 中心からのレイと各辺の交点を取る（AABB）
+  // 交点までのt(>0)を計算して最小の正のtを採用
+  const eps = 1e-6;
+  const tList = [];
+
+  // 左辺 x = x
+  if (Math.abs(dx) > eps) {
+    const t = (x - cx) / dx;
+    const yy = cy + t * dy;
+    if (t > 0 && yy >= y && yy <= y + h) tList.push({ t, px: x, py: yy });
+  }
+  // 右辺 x = x + w
+  if (Math.abs(dx) > eps) {
+    const t = (x + w - cx) / dx;
+    const yy = cy + t * dy;
+    if (t > 0 && yy >= y && yy <= y + h) tList.push({ t, px: x + w, py: yy });
+  }
+  // 上辺 y = y
+  if (Math.abs(dy) > eps) {
+    const t = (y - cy) / dy;
+    const xx = cx + t * dx;
+    if (t > 0 && xx >= x && xx <= x + w) tList.push({ t, px: xx, py: y });
+  }
+  // 下辺 y = y + h
+  if (Math.abs(dy) > eps) {
+    const t = (y + h - cy) / dy;
+    const xx = cx + t * dx;
+    if (t > 0 && xx >= x && xx <= x + w) tList.push({ t, px: xx, py: y + h });
+  }
+
+  if (tList.length === 0) return { x: cx, y: cy }; // 念のため
+  tList.sort((a, b) => a.t - b.t);
+  return { x: tList[0].px, y: tList[0].py };
+}
+
+function drawPointerGeneric(ctx2, el) {
+  // 三角（等腰）を anchor 上に配置し、pointerAngle 方向に突き出す
+  const base = getAnchorPoint(el);
   const size = 15;
-  ctx.fillStyle = fill;
-  ctx.beginPath();
+  const spread = Math.PI / 12; // 開き角
+  const ang = el.pointerAngle;
+  const tip = {
+    x: base.x + (size + 10) * Math.cos(ang),
+    y: base.y + (size + 10) * Math.sin(ang),
+  };
+  const left = {
+    x: base.x + size * Math.cos(ang - spread),
+    y: base.y + size * Math.sin(ang - spread),
+  };
+  const right = {
+    x: base.x + size * Math.cos(ang + spread),
+    y: base.y + size * Math.sin(ang + spread),
+  };
 
-  if (shape === "oval" || shape === "thought2") {
-    // 楕円など：外周に吸着
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = 0;
-    switch (pointerPosition) {
-      case "top": angle = -Math.PI / 2; break;
-      case "bottom": angle = Math.PI / 2; break;
-      case "left": angle = Math.PI; break;
-      case "right": angle = 0; break;
-    }
+  ctx2.fillStyle = el.fill;
+  ctx2.beginPath();
+  ctx2.moveTo(base.x, base.y);
+  ctx2.lineTo(left.x, left.y);
+  ctx2.lineTo(tip.x, tip.y);
+  ctx2.lineTo(right.x, right.y);
+  ctx2.closePath();
+  ctx2.fill();
+  ctx2.strokeStyle = "black";
+  ctx2.lineWidth = 1;
+  ctx2.stroke();
 
-    const baseX = cx + rx * Math.cos(angle);
-    const baseY = cy + ry * Math.sin(angle);
-    const angle1 = angle - Math.PI / 12;
-    const angle2 = angle + Math.PI / 12;
-    ctx.moveTo(baseX, baseY);
-    ctx.lineTo(cx + (rx + size) * Math.cos(angle1), cy + (ry + size) * Math.sin(angle1));
-    ctx.lineTo(cx + (rx + size) * Math.cos(angle2), cy + (ry + size) * Math.sin(angle2));
-  } else {
-    // 通常四角・角丸など
-    switch (pointerPosition) {
-      case "top":
-        const px1 = x + w * pointerOffset;
-        ctx.moveTo(px1 - size / 2, y);
-        ctx.lineTo(px1, y - size);
-        ctx.lineTo(px1 + size / 2, y);
-        break;
-      case "bottom":
-        const px2 = x + w * pointerOffset;
-        ctx.moveTo(px2 - size / 2, y + h);
-        ctx.lineTo(px2, y + h + size);
-        ctx.lineTo(px2 + size / 2, y + h);
-        break;
-      case "left":
-        const py1 = y + h * pointerOffset;
-        ctx.moveTo(x, py1 - size / 2);
-        ctx.lineTo(x - size, py1);
-        ctx.lineTo(x, py1 + size / 2);
-        break;
-      case "right":
-        const py2 = y + h * pointerOffset;
-        ctx.moveTo(x + w, py2 - size / 2);
-        ctx.lineTo(x + w + size, py2);
-        ctx.lineTo(x + w, py2 + size / 2);
-        break;
-    }
-  }
-
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // オレンジの操作ハンドル（先端）
+  ctx2.beginPath();
+  ctx2.fillStyle = "#ff7a00";
+  ctx2.arc(tip.x, tip.y, 6, 0, 2 * Math.PI);
+  ctx2.fill();
+  ctx2.strokeStyle = "#b85600";
+  ctx2.stroke();
 }
-
-function getPointerPos(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
-  if (shape === "oval") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = getPointerAngle(el);
-    return {
-      x: cx + rx * Math.cos(angle),
-      y: cy + ry * Math.sin(angle)
-    };
-  } else {
-    switch (pointerPosition) {
-      case "top": return { x: x + w * pointerOffset, y: y };
-      case "bottom": return { x: x + w * pointerOffset, y: y + h };
-      case "left": return { x: x, y: y + h * pointerOffset };
-      case "right": return { x: x + w, y: y + h * pointerOffset };
-    }
-  }
-}
-
-function getPointerAngle(el) {
-  switch (el.pointerPosition) {
-    case "top": return -Math.PI / 2;
-    case "bottom": return Math.PI / 2;
-    case "left": return Math.PI;
-    case "right": return 0;
-    default: return 0;
-  }
-}
-
 
 function renderCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -319,35 +268,36 @@ function renderCanvas() {
       ctx.strokeStyle = "black";
       ctx.lineWidth = 1;
       ctx.stroke();
-      drawPointer(el);
-    }
+      drawPointerGeneric(ctx, el);
 
-        if (el === selectedElement && el.type === "bubble") {
-      ctx.fillStyle = "blue";
-      ctx.fillRect(el.x + el.w - 5, el.y + el.h - 5, 10, 10);
-      const p = getPointerPos(el);
-      ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
+      // 選択インジケータ（従来の青ハンドル）
+      if (el === selectedElement) {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(el.x + el.w - 5, el.y + el.h - 5, 10, 10);
+      }
     }
-
 
     if (el.type === "text") {
       ctx.font = `${el.size || 24}px ${el.font}`;
       ctx.fillStyle = el.color;
       ctx.fillText(el.text, el.x, el.y);
 
-          if (el === selectedElement && el.type === "text") {
-      const width = ctx.measureText(el.text).width;
-      const height = el.size || 24;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeStyle = "black";
-      ctx.strokeRect(el.x, el.y - height + 4, width, height);
-      ctx.setLineDash([]);
-      ctx.fillStyle = "blue";
-      ctx.fillRect(el.x + width - 5, el.y - height - 5, 10, 10);
-    }
+      if (el === selectedElement) {
+        const width = ctx.measureText(el.text).width;
+        const height = el.size || 24;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeStyle = "black";
+        ctx.strokeRect(el.x, el.y - height + 4, width, height);
+        ctx.setLineDash([]);
+        ctx.fillStyle = "blue";
+        ctx.fillRect(el.x + width - 5, el.y - height - 5, 10, 10);
+      }
     }
   }
 }
+
+// ===== 入力系 =====
+let offsetX, offsetY;
 
 canvas.addEventListener("mousedown", onMouseDown);
 canvas.addEventListener("mousemove", onMouseMove);
@@ -364,39 +314,32 @@ canvas.addEventListener("touchend", (e) => {
 
 function getMousePos(e) {
   const rect = canvas.getBoundingClientRect();
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
-  };
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
 function onMouseDown(e) {
   const pos = getMousePos(e);
   selectedElement = null;
 
+  // まずはハンドル優先クリック判定
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
+    if (el.type !== "bubble") continue;
+    const tip = getPointerTip(el);
+    if (distance(pos, tip) <= 10) {
+      el.handleDragging = true;
+      selectedElement = el;
+      renderCanvas();
+      return;
+    }
+  }
+
+  // 通常の選択・ドラッグ
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i];
+
     if (el.type === "bubble") {
-      const pointerPos = getPointerPos(el);
-      if (Math.abs(pos.x - pointerPos.x) < 10 && Math.abs(pos.y - pointerPos.y) < 10) {
-        el.draggingPointer = true;
-        selectedElement = el;
-        return;
-      }
-      if (
-        Math.abs(pos.x - (el.x + el.w)) < 10 &&
-        Math.abs(pos.y - (el.y + el.h)) < 10
-      ) {
-        el.resizing = true;
-        selectedElement = el;
-        return;
-      }
-      if (
-        pos.x >= el.x &&
-        pos.x <= el.x + el.w &&
-        pos.y >= el.y &&
-        pos.y <= el.y + el.h
-      ) {
+      if (pointInRect(pos, el)) {
         el.dragging = true;
         offsetX = pos.x - el.x;
         offsetY = pos.y - el.y;
@@ -409,6 +352,7 @@ function onMouseDown(e) {
       const textWidth = ctx.measureText(el.text).width;
       const textHeight = fontSize;
 
+      // 右上リサイズ点
       if (
         pos.x >= el.x + textWidth - 5 &&
         pos.x <= el.x + textWidth + 5 &&
@@ -422,6 +366,7 @@ function onMouseDown(e) {
         return;
       }
 
+      // 本体ヒット
       if (
         pos.x >= el.x &&
         pos.x <= el.x + textWidth &&
@@ -437,6 +382,7 @@ function onMouseDown(e) {
     }
   }
 
+  // どれも選ばれてない→背景画像ドラッグ
   if (baseImage) {
     imageDragging = true;
     imageOffsetX = pos.x - imageX;
@@ -448,38 +394,24 @@ function onMouseMove(e) {
   const pos = getMousePos(e);
 
   if (selectedElement) {
-    if (selectedElement.type === "bubble") {
-      if (selectedElement.resizing) {
-        selectedElement.w = pos.x - selectedElement.x;
-        selectedElement.h = pos.y - selectedElement.y;
-      } else if (selectedElement.draggingPointer) {
-        const el = selectedElement;
-        const relX = (pos.x - el.x) / el.w;
-        const relY = (pos.y - el.y) / el.h;
-        if (relY < 0) {
-          el.pointerPosition = "top";
-          el.pointerOffset = Math.min(Math.max(relX, 0), 1);
-        } else if (relY > 1) {
-          el.pointerPosition = "bottom";
-          el.pointerOffset = Math.min(Math.max(relX, 0), 1);
-        } else if (relX < 0) {
-          el.pointerPosition = "left";
-          el.pointerOffset = Math.min(Math.max(relY, 0), 1);
-        } else if (relX > 1) {
-          el.pointerPosition = "right";
-          el.pointerOffset = Math.min(Math.max(relY, 0), 1);
-        }
-      } else if (selectedElement.dragging) {
-        selectedElement.x = pos.x - offsetX;
-        selectedElement.y = pos.y - offsetY;
+    const el = selectedElement;
+    if (el.type === "bubble") {
+      if (el.handleDragging) {
+        // 中心に対する角度を更新
+        const cx = el.x + el.w / 2;
+        const cy = el.y + el.h / 2;
+        el.pointerAngle = Math.atan2(pos.y - cy, pos.x - cx);
+      } else if (el.dragging) {
+        el.x = pos.x - offsetX;
+        el.y = pos.y - offsetY;
       }
-    } else if (selectedElement.type === "text") {
-      if (selectedElement.resizing) {
+    } else if (el.type === "text") {
+      if (el.resizing) {
         const dy = pos.y - resizeStartY;
-        selectedElement.size = Math.max(8, initialFontSize + dy * 0.2);
-      } else if (selectedElement.dragging) {
-        selectedElement.x = pos.x - offsetX;
-        selectedElement.y = pos.y - offsetY;
+        el.size = Math.max(8, initialFontSize + dy * 0.2);
+      } else if (el.dragging) {
+        el.x = pos.x - offsetX;
+        el.y = pos.y - offsetY;
       }
     }
   } else if (imageDragging) {
@@ -494,52 +426,32 @@ function onMouseUp() {
   if (selectedElement) {
     selectedElement.dragging = false;
     selectedElement.resizing = false;
-    selectedElement.draggingPointer = false;
+    selectedElement.handleDragging = false;
   }
   imageDragging = false;
   resizeStartY = null;
   initialFontSize = null;
 }
 
-function getElementAt(x, y) {
-  return elements.find(el => {
-    return (
-      x > el.x &&
-      y > el.y &&
-      x < el.x + el.width &&
-      y < el.y + el.height
-    );
-  });
+// ユーティリティ
+function pointInRect(p, r) {
+  return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+}
+function distance(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.hypot(dx, dy);
+}
+function getPointerTip(el) {
+  // drawPointerGeneric と同じ tip 算出
+  const base = getAnchorPoint(el);
+  const ang = el.pointerAngle;
+  return {
+    x: base.x + (15 + 10) * Math.cos(ang),
+    y: base.y + (15 + 10) * Math.sin(ang),
+  };
 }
 
-function getPointerPos(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
-  if (shape === "oval") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = 0;
-    switch (pointerPosition) {
-      case "top": angle = -Math.PI / 2; break;
-      case "bottom": angle = Math.PI / 2; break;
-      case "left": angle = Math.PI; break;
-      case "right": angle = 0; break;
-    }
-    return {
-      x: cx + rx * Math.cos(angle),
-      y: cy + ry * Math.sin(angle)
-    };
-  } else {
-    switch (pointerPosition) {
-      case "top": return { x: x + w * pointerOffset, y: y };
-      case "bottom": return { x: x + w * pointerOffset, y: y + h };
-      case "left": return { x: x, y: y + h * pointerOffset };
-      case "right": return { x: x + w, y: y + h * pointerOffset };
-    }
-  }
-}
-
+// ===== 保存処理 =====
 document.getElementById("saveImage").addEventListener("click", () => {
   const tempCanvas = document.createElement("canvas");
   const tempCtx = tempCanvas.getContext("2d");
@@ -559,7 +471,7 @@ document.getElementById("saveImage").addEventListener("click", () => {
       tempCtx.strokeStyle = "black";
       tempCtx.lineWidth = 1;
       tempCtx.stroke();
-      drawPointerToContext(tempCtx, el);
+      drawPointerGeneric(tempCtx, el);
     } else if (el.type === "text") {
       tempCtx.font = `${el.size || 24}px ${el.font}`;
       tempCtx.fillStyle = el.color;
@@ -568,7 +480,6 @@ document.getElementById("saveImage").addEventListener("click", () => {
   }
 
   const dataURL = tempCanvas.toDataURL();
-
   const link = document.createElement("a");
   link.download = "stamp.png";
   link.href = dataURL;
@@ -586,60 +497,11 @@ document.getElementById("saveImage").addEventListener("click", () => {
   document.getElementById("saveModal").style.display = "flex";
 });
 
-function drawText(el) {
-  ctx.save();
-  ctx.translate(el.x, el.y);
-  ctx.font = `${el.size}px ${el.font}`;
-  ctx.fillStyle = el.color;
-  ctx.fillText(el.text, 0, el.size);
-  ctx.restore();
-}
-
-function drawPointerToContext(ctx, el) {
-  const { x, y, w, h, pointerPosition, pointerOffset } = el;
-  const size = 15;
-  ctx.fillStyle = el.fill;
-  ctx.beginPath();
-  switch (pointerPosition) {
-    case "top":
-      const px1 = x + w * pointerOffset;
-      ctx.moveTo(px1 - size / 2, y);
-      ctx.lineTo(px1, y - size);
-      ctx.lineTo(px1 + size / 2, y);
-      break;
-    case "bottom":
-      const px2 = x + w * pointerOffset;
-      ctx.moveTo(px2 - size / 2, y + h);
-      ctx.lineTo(px2, y + h + size);
-      ctx.lineTo(px2 + size / 2, y + h);
-      break;
-    case "left":
-      const py1 = y + h * pointerOffset;
-      ctx.moveTo(x, py1 - size / 2);
-      ctx.lineTo(x - size, py1);
-      ctx.lineTo(x, py1 + size / 2);
-      break;
-    case "right":
-      const py2 = y + h * pointerOffset;
-      ctx.moveTo(x + w, py2 - size / 2);
-      ctx.lineTo(x + w + size, py2);
-      ctx.lineTo(x + w, py2 + size / 2);
-      break;
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-document.getElementById("closeModal").addEventListener("click", () => {
-  document.getElementById("saveModal").style.display = "none";
-});
-
+// ===== タッチ対応（既存互換） =====
 function onTouchStart(e) {
   if (e.touches.length > 1) return;
-
   e.preventDefault();
-  const now = new Date().getTime();
+  const now = Date.now();
   const pos = getTouchPos(e);
 
   if (now - lastTapTime < 300) {
@@ -649,54 +511,31 @@ function onTouchStart(e) {
       handleDoubleTap(pos);
     }
   }
-
   onMouseDown(convertTouchToMouseEvent(e));
-
   lastTapTime = now;
   lastTapPos = pos;
 }
-
 function getTouchPos(e) {
   const rect = canvas.getBoundingClientRect();
-  return {
-    x: e.touches[0].clientX - rect.left,
-    y: e.touches[0].clientY - rect.top,
-  };
+  return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
 }
-
 function convertTouchToMouseEvent(touchEvent) {
-  const touch = touchEvent.touches[0] || touchEvent.changedTouches[0];
-  return {
-    clientX: touch.clientX,
-    clientY: touch.clientY,
-  };
+  const t = touchEvent.touches[0] || touchEvent.changedTouches[0];
+  return { clientX: t.clientX, clientY: t.clientY };
 }
-
 function handleDoubleTap(pos) {
   selectedElement = null;
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
     if (el.type === "bubble") {
-      if (
-        pos.x >= el.x && pos.x <= el.x + el.w &&
-        pos.y >= el.y && pos.y <= el.y + el.h
-      ) {
-        selectedElement = el;
-        break;
-      }
+      if (pointInRect(pos, el)) { selectedElement = el; break; }
     } else if (el.type === "text") {
       const fontSize = el.size || 24;
       ctx.font = `${fontSize}px ${el.font}`;
       const textWidth = ctx.measureText(el.text).width;
       const textHeight = fontSize;
-      if (
-        pos.x >= el.x &&
-        pos.x <= el.x + textWidth &&
-        pos.y >= el.y - textHeight &&
-        pos.y <= el.y
-      ) {
-        selectedElement = el;
-        break;
+      if (pos.x >= el.x && pos.x <= el.x + textWidth && pos.y >= el.y - textHeight && pos.y <= el.y) {
+        selectedElement = el; break;
       }
     }
   }
