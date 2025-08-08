@@ -216,38 +216,42 @@ function getAnchorPoint(el) {
   return { x: tList[0].px, y: tList[0].py };
 }
 
+// 置き換え：ツノ（三角形）を外周に正しく接続
 function drawPointerGeneric(ctx2, el) {
-  // 三角（等腰）を anchor 上に配置し、pointerAngle 方向に突き出す
-  const base = getAnchorPoint(el);
-  const size = 15;
-  const spread = Math.PI / 12; // 開き角
-  const ang = el.pointerAngle;
-  const tip = {
-    x: base.x + (size + 10) * Math.cos(ang),
-    y: base.y + (size + 10) * Math.sin(ang),
-  };
-  const left = {
-    x: base.x + size * Math.cos(ang - spread),
-    y: base.y + size * Math.sin(ang - spread),
-  };
-  const right = {
-    x: base.x + size * Math.cos(ang + spread),
-    y: base.y + size * Math.sin(ang + spread),
-  };
+  const base = getAnchorPoint(el);       // 外周上の接点
+  const ang  = el.pointerAngle;          // 先端方向（外向き）
 
-  ctx2.fillStyle = el.fill;
+  // パラメータ：長さ・底辺幅・外周からの食い込み
+  const length = 18;     // 先端までの長さ
+  const baseW  = 22;     // 底辺の幅
+  const inset  = 1.0;    // 外周から内側へ少し押し込む量（隙間防止）
+
+  // 単位ベクトル：法線 n（外向き）、接線 t（左手系）
+  const nx = Math.cos(ang), ny = Math.sin(ang);
+  const tx = -Math.sin(ang), ty = Math.cos(ang);
+
+  // 底辺の中心を少し内側へ
+  const bx = base.x - nx * inset;
+  const by = base.y - ny * inset;
+
+  // 等腰三角形の3点
+  const left  = { x: bx + tx * (baseW / 2), y: by + ty * (baseW / 2) };
+  const right = { x: bx - tx * (baseW / 2), y: by - ty * (baseW / 2) };
+  const tip   = { x: base.x + nx * (length + inset), y: base.y + ny * (length + inset) };
+
+  // 本体と同色で塗って縁取り
   ctx2.beginPath();
-  ctx2.moveTo(base.x, base.y);
-  ctx2.lineTo(left.x, left.y);
-  ctx2.lineTo(tip.x, tip.y);
+  ctx2.moveTo(left.x, left.y);
+  ctx2.lineTo(tip.x,  tip.y);
   ctx2.lineTo(right.x, right.y);
   ctx2.closePath();
+  ctx2.fillStyle = el.fill;
   ctx2.fill();
   ctx2.strokeStyle = "black";
   ctx2.lineWidth = 1;
   ctx2.stroke();
 
-  // オレンジの操作ハンドル（先端）
+  // オレンジ操作ハンドル（先端）
   ctx2.beginPath();
   ctx2.fillStyle = "#ff7a00";
   ctx2.arc(tip.x, tip.y, 6, 0, 2 * Math.PI);
@@ -441,13 +445,15 @@ function distance(a, b) {
   const dx = a.x - b.x, dy = a.y - b.y;
   return Math.hypot(dx, dy);
 }
+
+// 置き換え：操作ハンドル（先端）の位置
 function getPointerTip(el) {
-  // drawPointerGeneric と同じ tip 算出
   const base = getAnchorPoint(el);
-  const ang = el.pointerAngle;
+  const ang  = el.pointerAngle;
+  const length = 18, inset = 1.0;
   return {
-    x: base.x + (15 + 10) * Math.cos(ang),
-    y: base.y + (15 + 10) * Math.sin(ang),
+    x: base.x + Math.cos(ang) * (length + inset),
+    y: base.y + Math.sin(ang) * (length + inset),
   };
 }
 
