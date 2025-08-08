@@ -9,6 +9,7 @@ let imageX = 0, imageY = 0;
 let imageDragging = false;
 let imageOffsetX = 0, imageOffsetY = 0;
 let offsetX = 0, offsetY = 0;
+let pointerScale = 1.0;
 
 let lastTapTime = 0;
 let lastTapPos = { x: 0, y: 0 };
@@ -158,6 +159,8 @@ function buildRoundedWithPointerPath(el) {
   const r  = Math.min(18, Math.max(6, Math.min(w, h) * 0.12));
   const bw = Math.min(w, h) * 0.16;     // ツノの基部幅
   const bl = bw * 0.90;                 // ツノの長さ
+  const bw  = bw0 * pointerScale;       // ← スライダー反映
+  const bl  = bl0 * pointerScale;       // ← スライダー反映
 
   // ストロークのにじみ防止（0.5px に寄せる）
   const L = Math.round(x) + 0.5;
@@ -329,6 +332,18 @@ function getPointerAngle(el) {
   }
 }
 
+function snapPointerOffset(el) {
+  const SNAP = 0.04; // 4%
+  const targets = [0, 0.5, 1];
+  let v = el.pointerOffset;
+  for (const t of targets) {
+    if (Math.abs(v - t) <= SNAP) {
+      v = t;
+      break;
+    }
+  }
+  el.pointerOffset = Math.max(0, Math.min(1, v));
+}
 
 function renderCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -413,6 +428,17 @@ canvas.addEventListener("touchend", (e) => {
   e.preventDefault();
   onMouseUp();
 });
+
+const pointerScaleInput = document.getElementById("pointerScale");
+const pointerScaleVal = document.getElementById("pointerScaleVal");
+if (pointerScaleInput) {
+  pointerScaleInput.addEventListener("input", (e) => {
+    const v = Number(e.target.value) || 100;
+    pointerScale = v / 100;
+    if (pointerScaleVal) pointerScaleVal.textContent = v + "%";
+    renderCanvas();
+  });
+}
 
 function getMousePos(e) {
   const rect = canvas.getBoundingClientRect();
@@ -521,6 +547,7 @@ function onMouseMove(e) {
           el.pointerPosition = "right";
           el.pointerOffset = Math.min(Math.max(relY, 0), 1);
         }
+        snapPointerOffset(el);
       } else if (selectedElement.dragging) {
         selectedElement.x = pos.x - offsetX;
         selectedElement.y = pos.y - offsetY;
