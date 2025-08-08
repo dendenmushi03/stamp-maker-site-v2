@@ -1,812 +1,437 @@
-const canvas = document.getElementById("editorCanvas");
-const ctx = canvas.getContext("2d");
-let elements = [];
-let selectedElement = null;
-let resizeStartY = null;
-let initialFontSize = null;
-let baseImage = null;
-let imageX = 0, imageY = 0;
-let imageDragging = false;
-let imageOffsetX = 0, imageOffsetY = 0;
-let offsetX = 0, offsetY = 0;
-let pointerScale = 1.0;
+// ====== 基本設定 ======
+const canvas = document.getElementById('editorCanvas');
+const ctx = canvas.getContext('2d');
+let bgTransparent = true;     // 背景透過フラグ
+let exportSize = 300;         // 出力サイズ
 
-let lastTapTime = 0;
-let lastTapPos = { x: 0, y: 0 };
+// 論理サイズは 300x300 固定（見た目はCSSで拡大）
+canvas.width = 300;
+canvas.height = 300;
 
-const bubbleShapeSelect = document.getElementById("bubbleShape");
+// ====== 状態管理（要素の配列） ======
+const state = {
+  elements: [],       // {id, type: 'bubble'|'text'|'image', x,y, w,h, ...}
+  selectedId: null,
+  history: [],
+  future: [],
+};
 
-document.getElementById("imageUpload").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  const reader = new FileReader();
-  reader.onload = () => {
-    const img = new Image();
-    img.onload = () => {
-      baseImage = img;
-      imageX = 0;
-      imageY = 0;
-      renderCanvas();
-    };
-    img.src = reader.result;
-  };
-  reader.readAsDataURL(file);
-});
+function snapshot() {
+  state.history.push(JSON.stringify(state.elements));
+  if (state.history.length > 50) state.history.shift();
+  state.future = []; // 未来は破棄
+}
+function undo() {
+  if (!state.history.length) return;
+  state.future.push(JSON.stringify(state.elements));
+  state.elements = JSON.parse(state.history.pop());
+  draw();
+}
+function redo() {
+  if (!state.future.length) return;
+  state.history.push(JSON.stringify(state.elements));
+  state.elements = JSON.parse(state.future.pop());
+  draw();
+}
 
-document.getElementById("addBubble").addEventListener("click", () => {
-  const selectedShape = bubbleShapeSelect?.value || "rounded";
-  elements.push({
-    type: "bubble",
-    shape: selectedShape,
-    x: 50,
-    y: 50,
-    w: 150,
-    h: 100,
-    pointerPosition: "bottom",
-    pointerOffset: 0.5,
-    fill: "#ffffff",
-    dragging: false,
-    resizing: false,
-    draggingPointer: false,
+// ====== 要素生成 ======
+const genId = () => Math.random().toString(36).slice(2, 9);
+
+function addBubble(shape = 'round') {
+  snapshot();
+  state.elements.push({
+    id: genId(),
+    type: 'bubble',
+    shape, x: 150, y: 150, w: 200, h: 140,
+    fill: document.getElementById('fillColor').value,
+    stroke: document.getElementById('strokeColor').value,
+    strokeW: parseInt(document.getElementById('strokeWidth').value, 10),
   });
-  renderCanvas();
-});
-
-document.getElementById("addText").addEventListener("click", () => {
-  const text = document.getElementById("textInput").value;
-  const font = document.getElementById("fontSelect").value;
-  const color = document.getElementById("textColor").value;
-  if (text) {
-    elements.push({
-      type: "text",
-      text,
-      font,
-      color,
-      x: 50,
-      y: 150,
-      size: 24,
-      dragging: false,
-      resizing: false,
-    });
-    renderCanvas();
-  }
-});
-
-document.getElementById("resetImagePosition").addEventListener("click", () => {
-  if (baseImage) {
-    imageX = 0;
-    imageY = 0;
-    renderCanvas();
-  }
-});
-
-document.getElementById("deleteSelected").addEventListener("click", () => {
-  if (selectedElement !== null) {
-    elements.splice(elements.indexOf(selectedElement), 1);
-    selectedElement = null;
-    renderCanvas();
-  }
-});
-
-function drawBubbleShape(el, ctx) {
-  const { x, y, w, h, shape } = el;
-  ctx.beginPath();
-  switch (shape) {
-    case "oval":
-      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
-      break;
-    case "rounded":
-      ctx.roundRect(x, y, w, h, 15);
-      break;
-    case "spike1":
-      drawSpikeBubble(ctx, x, y, w, h, 10);
-      break;
-    case "spike2":
-      drawSpikeBubble(ctx, x, y, w, h, 16);
-      break;
-    case "thought1":
-      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
-      drawThoughtDots(ctx, x + w, y + h);
-      break;
-    case "thought2":
-      drawCloudBubble(ctx, x, y, w, h);
-      drawThoughtDots(ctx, x + w, y + h);
-      break;
-    default:
-      ctx.roundRect(x, y, w, h, 15);
-  }
-  ctx.closePath();
+  draw();
 }
 
-function drawSpikeBubble(ctx, x, y, w, h, spikes) {
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const outerRadius = Math.min(w, h) / 2;
-  const innerRadius = outerRadius * 0.7;
-  const step = Math.PI / spikes;
-  ctx.moveTo(cx + outerRadius, cy);
-  for (let i = 0; i < 2 * spikes; i++) {
-    const r = (i % 2 === 0) ? outerRadius : innerRadius;
-    const angle = i * step;
-    ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-  }
-  ctx.closePath();
+function addText() {
+  snapshot();
+  state.elements.push({
+    id: genId(),
+    type: 'text',
+    x: 150, y: 150,
+    text: document.getElementById('textInput').value || 'テキスト',
+    color: document.getElementById('textColor').value,
+    size: parseInt(document.getElementById('fontSize').value, 10),
+    font: document.getElementById('fontFamily').value,
+    align: 'center',
+  });
+  draw();
 }
 
-function drawCloudBubble(ctx, x, y, w, h) {
-  const r = 10;
-  const steps = 12;
-  for (let i = 0; i < steps; i++) {
-    const angle = (i / steps) * 2 * Math.PI;
-    const cx = x + w / 2 + (w / 2 - r) * Math.cos(angle);
-    const cy = y + h / 2 + (h / 2 - r) * Math.sin(angle);
-    ctx.moveTo(cx + r, cy);
-    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  }
+function addImage(file) {
+  const img = new Image();
+  img.onload = () => {
+    snapshot();
+    // 画像はキャンバス中央に収まるようにスケーリング
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    state.elements.push({ id: genId(), type: 'image', x: 150, y: 150, w, h, img });
+    draw();
+  };
+  img.src = URL.createObjectURL(file);
 }
 
-function drawThoughtDots(ctx, x, y) {
-  ctx.moveTo(x, y);
-  ctx.arc(x + 5, y + 5, 5, 0, 2 * Math.PI);
-  ctx.moveTo(x + 15, y + 15);
-  ctx.arc(x + 15, y + 15, 3, 0, 2 * Math.PI);
-}
-
-// 角丸とツノを一体化した Path2D を作る（rounded 専用）
-function buildRoundedWithPointerPath(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset } = el;
-
-  // 角丸半径・ツノサイズ（パワポ寄せの比率）
-  const r   = Math.min(18, Math.max(6, Math.min(w, h) * 0.12));
-  const bw0 = Math.min(w, h) * 0.16;     // ツノの基部幅(基準)
-  const bl0 = bw0 * 0.90;                // ツノの長さ(基準)
-  const bw  = bw0 * pointerScale;        // スライダー反映
-  const bl  = bl0 * pointerScale;        // スライダー反映
-
-  // ストロークのにじみ防止（0.5px に寄せる）
-  const L = Math.round(x) + 0.5;
-  const T = Math.round(y) + 0.5;
-
-  const path = new Path2D();
-  // 角丸の本体
-  if (path.roundRect) {
-    path.roundRect(L, T, w, h, r);
-  } else {
-    // roundRectが無い環境向けの予備（簡略）
-    path.moveTo(L + r, T);
-    path.lineTo(L + w - r, T);
-    path.arc(L + w - r, T + r, r, -Math.PI/2, 0);
-    path.lineTo(L + w, T + h - r);
-    path.arc(L + w - r, T + h - r, r, 0, Math.PI/2);
-    path.lineTo(L + r, T + h);
-    path.arc(L + r, T + h - r, r, Math.PI/2, Math.PI);
-    path.lineTo(L, T + r);
-    path.arc(L + r, T + r, r, Math.PI, Math.PI*1.5);
-  }
-
-  // ツノの基準位置（角の丸み分はみ出さないようにクランプ）
-  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const half  = bw / 2;
-  let bx, by, t1x, t1y, t2x, t2y, tipx, tipy;
-
-  switch (pointerPosition) {
-    case "top": {
-      const base = clamp(x + w * pointerOffset, x + r + half, x + w - r - half);
-      bx = Math.round(base) + 0.5; by = T;
-      t1x = bx - half; t1y = by;
-      t2x = bx + half; t2y = by;
-      tipx = bx;       tipy = by - bl;
-      break;
-    }
-    case "bottom": {
-      const base = clamp(x + w * pointerOffset, x + r + half, x + w - r - half);
-      bx = Math.round(base) + 0.5; by = T + h;
-      t1x = bx - half; t1y = by;
-      t2x = bx + half; t2y = by;
-      tipx = bx;       tipy = by + bl;
-      break;
-    }
-    case "left": {
-      const base = clamp(y + h * pointerOffset, y + r + half, y + h - r - half);
-      bx = L;          by = Math.round(base) + 0.5;
-      t1x = bx;        t1y = by - half;
-      t2x = bx;        t2y = by + half;
-      tipx = bx - bl;  tipy = by;
-      break;
-    }
-    case "right": {
-      const base = clamp(y + h * pointerOffset, y + r + half, y + h - r - half);
-      bx = L + w;      by = Math.round(base) + 0.5;
-      t1x = bx;        t1y = by - half;
-      t2x = bx;        t2y = by + half;
-      tipx = bx + bl;  tipy = by;
-      break;
-    }
-  }
-
-  // ツノ（三角形）を同じパスに追加
-  path.moveTo(t1x, t1y);
-  path.lineTo(tipx, tipy);
-  path.lineTo(t2x, t2y);
-  path.closePath();
-
-  return { path, strokeW: 2.0, radius: r };
-}
-
-// 汎用：rounded のときだけ一体パス、それ以外は null を返す
-function buildBubblePath(el) {
-  if (el.shape === "rounded") return buildRoundedWithPointerPath(el);
-  return null;
-}
-
-function drawPointer(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, fill, shape } = el;
-  const size = 15;
-  ctx.fillStyle = fill;
-  ctx.beginPath();
-
-  if (shape === "oval" || shape === "thought2") {
-    // 楕円など：外周に吸着
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = 0;
-    switch (pointerPosition) {
-      case "top": angle = -Math.PI / 2; break;
-      case "bottom": angle = Math.PI / 2; break;
-      case "left": angle = Math.PI; break;
-      case "right": angle = 0; break;
-    }
-
-    const baseX = cx + rx * Math.cos(angle);
-    const baseY = cy + ry * Math.sin(angle);
-    const angle1 = angle - Math.PI / 12;
-    const angle2 = angle + Math.PI / 12;
-    ctx.moveTo(baseX, baseY);
-    ctx.lineTo(cx + (rx + size) * Math.cos(angle1), cy + (ry + size) * Math.sin(angle1));
-    ctx.lineTo(cx + (rx + size) * Math.cos(angle2), cy + (ry + size) * Math.sin(angle2));
-  } else {
-    // 通常四角・角丸など
-    switch (pointerPosition) {
-      case "top":
-        const px1 = x + w * pointerOffset;
-        ctx.moveTo(px1 - size / 2, y);
-        ctx.lineTo(px1, y - size);
-        ctx.lineTo(px1 + size / 2, y);
-        break;
-      case "bottom":
-        const px2 = x + w * pointerOffset;
-        ctx.moveTo(px2 - size / 2, y + h);
-        ctx.lineTo(px2, y + h + size);
-        ctx.lineTo(px2 + size / 2, y + h);
-        break;
-      case "left":
-        const py1 = y + h * pointerOffset;
-        ctx.moveTo(x, py1 - size / 2);
-        ctx.lineTo(x - size, py1);
-        ctx.lineTo(x, py1 + size / 2);
-        break;
-      case "right":
-        const py2 = y + h * pointerOffset;
-        ctx.moveTo(x + w, py2 - size / 2);
-        ctx.lineTo(x + w + size, py2);
-        ctx.lineTo(x + w, py2 + size / 2);
-        break;
-    }
-  }
-
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-function getPointerPos(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
-  if (shape === "oval") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = getPointerAngle(el);
-    return {
-      x: cx + rx * Math.cos(angle),
-      y: cy + ry * Math.sin(angle)
-    };
-  } else {
-    switch (pointerPosition) {
-      case "top": return { x: x + w * pointerOffset, y: y };
-      case "bottom": return { x: x + w * pointerOffset, y: y + h };
-      case "left": return { x: x, y: y + h * pointerOffset };
-      case "right": return { x: x + w, y: y + h * pointerOffset };
-    }
-  }
-}
-
-function getPointerAngle(el) {
-  switch (el.pointerPosition) {
-    case "top": return -Math.PI / 2;
-    case "bottom": return Math.PI / 2;
-    case "left": return Math.PI;
-    case "right": return 0;
-    default: return 0;
-  }
-}
-
-function snapPointerOffset(el) {
-  const SNAP = 0.04; // 4%
-  const targets = [0, 0.5, 1];
-  let v = el.pointerOffset;
-  for (const t of targets) {
-    if (Math.abs(v - t) <= SNAP) {
-      v = t;
-      break;
-    }
-  }
-  el.pointerOffset = Math.max(0, Math.min(1, v));
-}
-
-function renderCanvas() {
+// ====== 描画 ======
+function drawBackground() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (baseImage) ctx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
-
-  for (const el of elements) {
-    if (el.type === "bubble") {
-  const built = buildBubblePath(el);
-  if (built) {
-    // 一体パス（rounded 専用）
-    const { path, strokeW } = built;
-
-    ctx.lineJoin = "round";
-    ctx.lineCap  = "round";
-    ctx.miterLimit = 2.5;
-
-    // 塗りにだけ影を適用（パワポ風）
-    ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.18)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 1;
-    ctx.fillStyle = el.fill;
-    ctx.fill(path, "nonzero");
-    ctx.restore();
-
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = strokeW;
-    ctx.stroke(path);
-  } else {
-    // 既存形状は従来描画
-    ctx.fillStyle = el.fill;
-    drawBubbleShape(el, ctx);
-    ctx.fill();
-
-    ctx.lineJoin = "round";
-    ctx.lineCap  = "round";
-    ctx.miterLimit = 2.5;
-
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    drawPointer(el);
+  if (!bgTransparent) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 }
 
-        if (el === selectedElement && el.type === "bubble") {
-      ctx.fillStyle = "blue";
-      ctx.fillRect(el.x + el.w - 5, el.y + el.h - 5, 10, 10);
-      const p = getPointerPos(el);
-      ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
-    }
-
-
-    if (el.type === "text") {
-      ctx.font = `${el.size || 24}px ${el.font}`;
-      ctx.fillStyle = el.color;
-      ctx.fillText(el.text, el.x, el.y);
-
-          if (el === selectedElement && el.type === "text") {
-      const width = ctx.measureText(el.text).width;
-      const height = el.size || 24;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeStyle = "black";
-      ctx.strokeRect(el.x, el.y - height + 4, width, height);
-      ctx.setLineDash([]);
-      ctx.fillStyle = "blue";
-      ctx.fillRect(el.x + width - 5, el.y - height - 5, 10, 10);
-    }
-    }
-  }
-}
-
-canvas.addEventListener("mousedown", onMouseDown);
-canvas.addEventListener("mousemove", onMouseMove);
-canvas.addEventListener("mouseup", onMouseUp);
-canvas.addEventListener("touchstart", onTouchStart);
-canvas.addEventListener("touchmove", (e) => {
-  e.preventDefault();
-  onMouseMove(convertTouchToMouseEvent(e));
-});
-canvas.addEventListener("touchend", (e) => {
-  e.preventDefault();
-  onMouseUp();
-});
-
-const pointerScaleInput = document.getElementById("pointerScale");
-const pointerScaleVal = document.getElementById("pointerScaleVal");
-if (pointerScaleInput) {
-  pointerScaleInput.addEventListener("input", (e) => {
-    const v = Number(e.target.value) || 100;
-    pointerScale = v / 100;
-    if (pointerScaleVal) pointerScaleVal.textContent = v + "%";
-    renderCanvas();
-  });
-}
-
-function getMousePos(e) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
-  };
-}
-
-function onMouseDown(e) {
-  const pos = getMousePos(e);
-  selectedElement = null;
-
-  for (let i = elements.length - 1; i >= 0; i--) {
-    const el = elements[i];
-    if (el.type === "bubble") {
-      const pointerPos = getPointerPos(el);
-      if (Math.abs(pos.x - pointerPos.x) < 10 && Math.abs(pos.y - pointerPos.y) < 10) {
-        el.draggingPointer = true;
-        selectedElement = el;
-        return;
-      }
-      if (
-        Math.abs(pos.x - (el.x + el.w)) < 10 &&
-        Math.abs(pos.y - (el.y + el.h)) < 10
-      ) {
-        el.resizing = true;
-        selectedElement = el;
-        return;
-      }
-      if (
-        pos.x >= el.x &&
-        pos.x <= el.x + el.w &&
-        pos.y >= el.y &&
-        pos.y <= el.y + el.h
-      ) {
-        el.dragging = true;
-        offsetX = pos.x - el.x;
-        offsetY = pos.y - el.y;
-        selectedElement = el;
-        return;
-      }
-    } else if (el.type === "text") {
-      const fontSize = el.size || 24;
-      ctx.font = `${fontSize}px ${el.font}`;
-      const textWidth = ctx.measureText(el.text).width;
-      const textHeight = fontSize;
-
-      if (
-        pos.x >= el.x + textWidth - 5 &&
-        pos.x <= el.x + textWidth + 5 &&
-        pos.y >= el.y - textHeight - 5 &&
-        pos.y <= el.y - textHeight + 5
-      ) {
-        el.resizing = true;
-        selectedElement = el;
-        resizeStartY = pos.y;
-        initialFontSize = el.size || 24;
-        return;
-      }
-
-      if (
-        pos.x >= el.x &&
-        pos.x <= el.x + textWidth &&
-        pos.y >= el.y - textHeight &&
-        pos.y <= el.y
-      ) {
-        el.dragging = true;
-        offsetX = pos.x - el.x;
-        offsetY = pos.y - el.y;
-        selectedElement = el;
-        return;
-      }
-    }
-  }
-
-  if (baseImage) {
-    imageDragging = true;
-    imageOffsetX = pos.x - imageX;
-    imageOffsetY = pos.y - imageY;
-  }
-}
-
-function onMouseMove(e) {
-  const pos = getMousePos(e);
-
-  if (selectedElement) {
-    if (selectedElement.type === "bubble") {
-      if (selectedElement.resizing) {
-        selectedElement.w = pos.x - selectedElement.x;
-        selectedElement.h = pos.y - selectedElement.y;
-      } else if (selectedElement.draggingPointer) {
-        const el = selectedElement;
-        const relX = (pos.x - el.x) / el.w;
-        const relY = (pos.y - el.y) / el.h;
-        if (relY < 0) {
-          el.pointerPosition = "top";
-          el.pointerOffset = Math.min(Math.max(relX, 0), 1);
-        } else if (relY > 1) {
-          el.pointerPosition = "bottom";
-          el.pointerOffset = Math.min(Math.max(relX, 0), 1);
-        } else if (relX < 0) {
-          el.pointerPosition = "left";
-          el.pointerOffset = Math.min(Math.max(relY, 0), 1);
-        } else if (relX > 1) {
-          el.pointerPosition = "right";
-          el.pointerOffset = Math.min(Math.max(relY, 0), 1);
-        }
-        snapPointerOffset(el);
-      } else if (selectedElement.dragging) {
-        selectedElement.x = pos.x - offsetX;
-        selectedElement.y = pos.y - offsetY;
-      }
-    } else if (selectedElement.type === "text") {
-      if (selectedElement.resizing) {
-        const dy = pos.y - resizeStartY;
-        selectedElement.size = Math.max(8, initialFontSize + dy * 0.2);
-      } else if (selectedElement.dragging) {
-        selectedElement.x = pos.x - offsetX;
-        selectedElement.y = pos.y - offsetY;
-      }
-    }
-  } else if (imageDragging) {
-    imageX = pos.x - imageOffsetX;
-    imageY = pos.y - imageOffsetY;
-  }
-
-  renderCanvas();
-}
-
-function onMouseUp() {
-  if (selectedElement) {
-    selectedElement.dragging = false;
-    selectedElement.resizing = false;
-    selectedElement.draggingPointer = false;
-  }
-  imageDragging = false;
-  resizeStartY = null;
-  initialFontSize = null;
-}
-
-function getPointerPos(el) {
-  const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
-  if (shape === "oval") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    const rx = w / 2;
-    const ry = h / 2;
-    let angle = 0;
-    switch (pointerPosition) {
-      case "top": angle = -Math.PI / 2; break;
-      case "bottom": angle = Math.PI / 2; break;
-      case "left": angle = Math.PI; break;
-      case "right": angle = 0; break;
-    }
-    return {
-      x: cx + rx * Math.cos(angle),
-      y: cy + ry * Math.sin(angle)
-    };
-  } else {
-    switch (pointerPosition) {
-      case "top": return { x: x + w * pointerOffset, y: y };
-      case "bottom": return { x: x + w * pointerOffset, y: y + h };
-      case "left": return { x: x, y: y + h * pointerOffset };
-      case "right": return { x: x + w, y: y + h * pointerOffset };
-    }
-  }
-}
-
-document.getElementById("saveImage").addEventListener("click", () => {
-  const tempCanvas = document.createElement("canvas");
-  const tempCtx = tempCanvas.getContext("2d");
-
-  tempCanvas.width = canvas.width;
-  tempCanvas.height = canvas.height;
-
-  if (baseImage) {
-    tempCtx.drawImage(baseImage, imageX, imageY, canvas.width, canvas.height);
-  }
-
-  for (const el of elements) {
-  if (el.type === "bubble") {
-    const built = buildBubblePath(el);
-    if (built) {
-      const { path, strokeW } = built;
-
-// ★追加：線の質感
-tempCtx.lineJoin = "round";
-tempCtx.lineCap  = "round";
-tempCtx.miterLimit = 2.5;
-
-// 影（出力も少し強めに合わせる）
-tempCtx.save();
-tempCtx.shadowColor = "rgba(0,0,0,0.22)";
-tempCtx.shadowBlur = 7;
-tempCtx.shadowOffsetY = 2;
-tempCtx.fillStyle = el.fill;
-tempCtx.fill(path, "nonzero");
-tempCtx.restore();
-
-tempCtx.strokeStyle = "black";
-tempCtx.lineWidth = strokeW;
-tempCtx.stroke(path);
-
-    } else {
-      tempCtx.fillStyle = el.fill;
-      drawBubbleShape(el, tempCtx);
-      tempCtx.fill();
-
-      tempCtx.lineJoin = "round";
-tempCtx.lineCap  = "round";
-tempCtx.miterLimit = 2.5;
-
-      tempCtx.strokeStyle = "black";
-      tempCtx.lineWidth = 1;
-      tempCtx.stroke();
-      drawPointerToContext(tempCtx, el);
-    }
-  } else if (el.type === "text") {
-    // 保存画像にもテキストを書き込む
-    tempCtx.font = `${el.size || 24}px ${el.font || 'sans-serif'}`;
-    tempCtx.fillStyle = el.color || '#000';
-    tempCtx.fillText(el.text, el.x, el.y);
-  }
-} // ← このカッコで for を閉じる
-
-  const dataURL = tempCanvas.toDataURL();
-
-  const link = document.createElement("a");
-  link.download = "stamp.png";
-  link.href = dataURL;
-  link.click();
-
-  const modalImg = document.getElementById("savedImagePreview");
-  modalImg.src = dataURL;
-
-  const encodedUrl = encodeURIComponent(window.location.href);
-  const encodedText = encodeURIComponent("スタンプメーカーで画像を作ってみたよ！ #スタンプメーカー");
-  document.getElementById("modalShareX").href = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
-  document.getElementById("modalShareLINE").href = `https://social-plugins.line.me/lineit/share?url=${encodedUrl}`;
-  document.getElementById("modalShareInsta").href = `https://www.instagram.com`;
-
-  document.getElementById("saveModal").style.display = "flex";
-});
-
-function drawText(el) {
+function drawBubble(el) {
   ctx.save();
   ctx.translate(el.x, el.y);
-  ctx.font = `${el.size}px ${el.font}`;
-  ctx.fillStyle = el.color;
-  ctx.fillText(el.text, 0, el.size);
+  ctx.fillStyle = el.fill; ctx.strokeStyle = el.stroke; ctx.lineWidth = el.strokeW; ctx.lineJoin = 'round';
+  const w = el.w, h = el.h; const r = 24;
+  ctx.beginPath();
+  if (el.shape === 'rect') {
+    // 角丸
+    roundedRectPath(-w/2, -h/2, w, h, 18);
+  } else if (el.shape === 'cloud') {
+    cloudPath(w, h);
+  } else if (el.shape === 'thought') {
+    thoughtPath(w, h);
+  } else {
+    // 丸
+    roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
+  }
+  ctx.fill(); ctx.stroke();
   ctx.restore();
 }
 
-function drawPointerToContext(ctx, el) {
-  const { x, y, w, h, pointerPosition, pointerOffset } = el;
-  const size = 15;
-  ctx.fillStyle = el.fill;
-  ctx.beginPath();
-  switch (pointerPosition) {
-    case "top":
-      const px1 = x + w * pointerOffset;
-      ctx.moveTo(px1 - size / 2, y);
-      ctx.lineTo(px1, y - size);
-      ctx.lineTo(px1 + size / 2, y);
-      break;
-    case "bottom":
-      const px2 = x + w * pointerOffset;
-      ctx.moveTo(px2 - size / 2, y + h);
-      ctx.lineTo(px2, y + h + size);
-      ctx.lineTo(px2 + size / 2, y + h);
-      break;
-    case "left":
-      const py1 = y + h * pointerOffset;
-      ctx.moveTo(x, py1 - size / 2);
-      ctx.lineTo(x - size, py1);
-      ctx.lineTo(x, py1 + size / 2);
-      break;
-    case "right":
-      const py2 = y + h * pointerOffset;
-      ctx.moveTo(x + w, py2 - size / 2);
-      ctx.lineTo(x + w + size, py2);
-      ctx.lineTo(x + w, py2 + size / 2);
-      break;
-  }
+function roundedRectPath(x, y, w, h, r) {
+  const rr = Math.min(r, w/2, h/2);
+  ctx.moveTo(x+rr, y);
+  ctx.arcTo(x+w, y, x+w, y+h, rr);
+  ctx.arcTo(x+w, y+h, x, y+h, rr);
+  ctx.arcTo(x, y+h, x, y, rr);
+  ctx.arcTo(x, y, x+w, y, rr);
   ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+}
+function cloudPath(w, h) {
+  const a = Math.min(w, h)/2;
+  ctx.save(); ctx.translate(-w/2, -h/2);
+  ctx.beginPath();
+  ctx.arc(a*0.8, a*0.9, a*0.55, 0, Math.PI*2);
+  ctx.arc(a*1.2, a*0.7, a*0.6, 0, Math.PI*2);
+  ctx.arc(a*1.6, a*0.9, a*0.5, 0, Math.PI*2);
+  ctx.arc(a*1.2, a*1.2, a*0.6, 0, Math.PI*2);
+  ctx.closePath();
+  ctx.restore();
+}
+function thoughtPath(w, h) {
+  cloudPath(w*0.9, h*0.9);
+  // しっぽ
+  ctx.moveTo(w*0.1 - w/2, h*0.4 - h/2);
+  ctx.arc(w*0.1 - w/2, h*0.4 - h/2, 8, 0, Math.PI*2);
+  ctx.moveTo(w*0.05 - w/2, h*0.55 - h/2);
+  ctx.arc(w*0.05 - w/2, h*0.55 - h/2, 5, 0, Math.PI*2);
 }
 
-document.getElementById("closeModal").addEventListener("click", () => {
-  document.getElementById("saveModal").style.display = "none";
-});
+function drawText(el) {
+  ctx.save();
+  ctx.fillStyle = el.color; ctx.font = `${el.size}px ${el.font}`; ctx.textAlign = el.align; ctx.textBaseline = 'middle';
+  ctx.translate(el.x, el.y);
+  wrapText(el.text, 0, 0, 240, el.size * 1.2);
+  ctx.restore();
+}
 
-function onTouchStart(e) {
-  if (e.touches.length > 1) return;
-
-  e.preventDefault();
-  const now = new Date().getTime();
-  const pos = getTouchPos(e);
-
-  if (now - lastTapTime < 300) {
-    const dx = pos.x - lastTapPos.x;
-    const dy = pos.y - lastTapPos.y;
-    if (Math.sqrt(dx * dx + dy * dy) < 20) {
-      handleDoubleTap(pos);
-    }
+function wrapText(text, x, y, maxWidth, lineHeight) {
+  const words = text.split(/\s+/);
+  let line = '';
+  const lines = [];
+  for (let n=0; n<words.length; n++) {
+    const testLine = line + words[n] + ' ';
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && n>0) { lines.push(line); line = words[n] + ' '; }
+    else { line = testLine; }
   }
-
-  onMouseDown(convertTouchToMouseEvent(e));
-
-  lastTapTime = now;
-  lastTapPos = pos;
+  lines.push(line);
+  const offsetY = -((lines.length-1) * lineHeight) / 2;
+  lines.forEach((l, i) => ctx.fillText(l.trim(), x, y + offsetY + i*lineHeight));
 }
 
-function getTouchPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: e.touches[0].clientX - rect.left,
-    y: e.touches[0].clientY - rect.top,
-  };
+function drawImageEl(el) {
+  ctx.save();
+  ctx.drawImage(el.img, el.x - el.w/2, el.y - el.h/2, el.w, el.h);
+  ctx.restore();
 }
 
-function convertTouchToMouseEvent(touchEvent) {
-  const touch = touchEvent.touches[0] || touchEvent.changedTouches[0];
-  return {
-    clientX: touch.clientX,
-    clientY: touch.clientY,
-  };
-}
-
-function handleDoubleTap(pos) {
-  selectedElement = null;
-  for (let i = elements.length - 1; i >= 0; i--) {
-    const el = elements[i];
-    if (el.type === "bubble") {
-      if (
-        pos.x >= el.x && pos.x <= el.x + el.w &&
-        pos.y >= el.y && pos.y <= el.y + el.h
-      ) {
-        selectedElement = el;
-        break;
-      }
-    } else if (el.type === "text") {
-      const fontSize = el.size || 24;
-      ctx.font = `${fontSize}px ${el.font}`;
-      const textWidth = ctx.measureText(el.text).width;
-      const textHeight = fontSize;
-      if (
-        pos.x >= el.x &&
-        pos.x <= el.x + textWidth &&
-        pos.y >= el.y - textHeight &&
-        pos.y <= el.y
-      ) {
-        selectedElement = el;
-        break;
-      }
-    }
-  }
-  renderCanvas();
-}
-
-document.getElementById("savedImagePreview").addEventListener("click", () => {
-  const dataURL = document.getElementById("savedImagePreview").src;
-  const newWindow = window.open();
-  if (newWindow) {
-    newWindow.document.write(`<img src="${dataURL}" style="width:100%">`);
+function drawSelection(el) {
+  ctx.save();
+  ctx.strokeStyle = '#5ca7ff'; ctx.setLineDash([6,4]); ctx.lineWidth = 2;
+  if (el.type === 'text') {
+    const w = 260, h = el.size*1.6; // ざっくり
+    ctx.strokeRect(el.x - w/2, el.y - h/2, w, h);
   } else {
-    alert("ポップアップがブロックされました。設定をご確認ください。");
+    ctx.strokeRect(el.x - el.w/2, el.y - el.h/2, el.w, el.h);
+  }
+  ctx.restore();
+}
+
+function draw() {
+  drawBackground();
+  for (const el of state.elements) {
+    if (el.type === 'image') drawImageEl(el);
+  }
+  for (const el of state.elements) {
+    if (el.type === 'bubble') drawBubble(el);
+  }
+  for (const el of state.elements) {
+    if (el.type === 'text') drawText(el);
+  }
+  const sel = state.elements.find(e => e.id === state.selectedId);
+  if (sel) drawSelection(sel);
+}
+
+// ====== ヒットテスト & ドラッグ ======
+function hitTest(x, y) {
+  // 上から（見た目の最前面）
+  for (let i = state.elements.length - 1; i >= 0; i--) {
+    const el = state.elements[i];
+    if (el.type === 'text') {
+      const w = 260, h = el.size*1.6;
+      if (x > el.x - w/2 && x < el.x + w/2 && y > el.y - h/2 && y < el.y + h/2) return el.id;
+    } else {
+      if (x > el.x - el.w/2 && x < el.x + el.w/2 && y > el.y - el.h/2 && y < el.y + el.h/2) return el.id;
+    }
+  }
+  return null;
+}
+
+let dragging = false;
+let dragOffsetX = 0, dragOffsetY = 0;
+
+function pointerPos(evt) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+  const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+  const x = (clientX - rect.left) * (canvas.width / rect.width);
+  const y = (clientY - rect.top) * (canvas.height / rect.height);
+  return { x, y };
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  const {x, y} = pointerPos(e);
+  const id = hitTest(x, y);
+  if (id) {
+    state.selectedId = id; dragging = true;
+    const sel = state.elements.find(el => el.id === id);
+    dragOffsetX = x - sel.x; dragOffsetY = y - sel.y;
+    snapshot();
+    draw();
+  } else { state.selectedId = null; draw(); }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  const {x, y} = pointerPos(e);
+  const sel = state.elements.find(el => el.id === state.selectedId);
+  if (!sel) return;
+  sel.x = x - dragOffsetX; sel.y = y - dragOffsetY;
+  draw();
+});
+
+canvas.addEventListener('pointerup', () => { dragging = false; });
+canvas.addEventListener('pointercancel', () => { dragging = false; });
+
+// ====== UIイベント ======
+const tabButtons = document.querySelectorAll('.tab');
+const panels = document.querySelectorAll('.panel');
+
+tabButtons.forEach(btn => btn.addEventListener('click', () => {
+  tabButtons.forEach(b => b.classList.remove('is-active'));
+  panels.forEach(p => p.classList.remove('is-active'));
+  btn.classList.add('is-active');
+  document.querySelector(`.panel[data-panel="${btn.dataset.tab}"]`).classList.add('is-active');
+}));
+
+// 追加ボタンたち
+Array.from(document.querySelectorAll('[data-action="add-bubble"]')).forEach(b => {
+  b.addEventListener('click', () => addBubble(b.dataset.shape));
+});
+
+document.getElementById('addTextBtn').addEventListener('click', addText);
+
+document.getElementById('textInput').addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (sel) { sel.text = e.target.value; draw(); }
+});
+
+document.getElementById('fontSize').addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (sel) { sel.size = parseInt(e.target.value, 10); draw(); }
+});
+
+document.getElementById('fontFamily').addEventListener('change', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (sel) { sel.font = e.target.value; draw(); }
+});
+
+document.getElementById('fillColor').addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'bubble');
+  if (sel) { sel.fill = e.target.value; draw(); }
+});
+
+document.getElementById('strokeColor').addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'bubble');
+  if (sel) { sel.stroke = e.target.value; draw(); }
+});
+
+document.getElementById('textColor').addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (sel) { sel.color = e.target.value; draw(); }
+});
+
+document.getElementById('strokeWidth').addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'bubble');
+  if (sel) { sel.strokeW = parseInt(e.target.value, 10); draw(); }
+});
+
+// 背景画像
+const addImageBtn = document.getElementById('addImageBtn');
+const imageUpload = document.getElementById('imageUpload');
+const centerUploadBtn = document.getElementById('centerUploadBtn');
+addImageBtn.addEventListener('click', () => imageUpload.click());
+centerUploadBtn.addEventListener('click', () => imageUpload.click());
+imageUpload.addEventListener('change', (e) => {
+  const f = e.target.files?.[0];
+  if (f) {
+    addImage(f);
+    if (centerUploadBtn) centerUploadBtn.style.display = 'none';
   }
 });
+
+// ランダムスタイル
+function randomStyle() {
+  const pal = ["#ffffff", "#fef7d1", "#e6f7ff", "#fbe3e8", "#e6ffe8"];
+  const stroke = ["#000000", "#1a1a1a", "#2d2d2d"];
+  const fonts = [
+    "Noto Sans JP, system-ui, sans-serif",
+    "'Zen Maru Gothic', system-ui, sans-serif",
+    "'Shippori Mincho', serif",
+    "'RocknRoll One', system-ui, sans-serif"
+  ];
+  const sel = state.elements.find(el => el.id === state.selectedId);
+  if (!sel) return;
+  if (sel.type === 'bubble') {
+    sel.fill = pal[Math.floor(Math.random()*pal.length)];
+    sel.stroke = stroke[Math.floor(Math.random()*stroke.length)];
+    sel.strokeW = 4 + Math.floor(Math.random()*10);
+  } else if (sel.type === 'text') {
+    sel.color = stroke[Math.floor(Math.random()*stroke.length)];
+    sel.font = fonts[Math.floor(Math.random()*fonts.length)];
+    sel.size = 20 + Math.floor(Math.random()*60);
+  }
+  draw();
+}
+
+document.getElementById('randomBtn').addEventListener('click', randomStyle);
+
+// 背景透過切替
+const toggleBgBtn = document.getElementById('toggleBgBtn');
+toggleBgBtn.addEventListener('click', () => {
+  bgTransparent = !bgTransparent;
+  toggleBgBtn.textContent = `背景：${bgTransparent ? '透過' : '白'}`;
+  draw();
+});
+
+// 保存
+const exportSizeRange = document.getElementById('exportSize');
+const exportSizeVal = document.getElementById('exportSizeVal');
+const saveBtn = document.getElementById('saveBtn');
+const saveResult = document.getElementById('saveResult');
+const previewImg = document.getElementById('previewImg');
+const downloadLink = document.getElementById('downloadLink');
+
+exportSizeRange.addEventListener('input', (e) => {
+  exportSize = parseInt(e.target.value, 10);
+  exportSizeVal.textContent = `${exportSize}px`;
+});
+
+saveBtn.addEventListener('click', () => {
+  // 一時キャンバスで高解像度描画
+  const tmp = document.createElement('canvas');
+  tmp.width = exportSize; tmp.height = exportSize;
+  const tctx = tmp.getContext('2d');
+
+  // 背景
+  if (!bgTransparent) { tctx.fillStyle = '#ffffff'; tctx.fillRect(0,0,tmp.width,tmp.height); }
+
+  // スケール比
+  const s = exportSize / canvas.width;
+  // 画像
+  for (const el of state.elements) {
+    if (el.type === 'image') {
+      tctx.drawImage(el.img, (el.x - el.w/2)*s, (el.y - el.h/2)*s, el.w*s, el.h*s);
+    }
+  }
+  // 吹き出し
+  for (const el of state.elements) {
+    if (el.type === 'bubble') {
+      tctx.save();
+      tctx.translate(el.x*s, el.y*s);
+      tctx.fillStyle = el.fill; tctx.strokeStyle = el.stroke; tctx.lineWidth = el.strokeW*s; tctx.lineJoin = 'round';
+      tctx.beginPath();
+      // 同じ形状で簡略描画
+      const w = el.w*s, h = el.h*s;
+      const rr = Math.min(Math.min(w, h)/2, 24*s);
+      // 丸・角丸の簡易版
+      tctx.moveTo(-w/2+rr, -h/2);
+      tctx.arcTo(w/2, -h/2, w/2, h/2, rr);
+      tctx.arcTo(w/2, h/2, -w/2, h/2, rr);
+      tctx.arcTo(-w/2, h/2, -w/2, -h/2, rr);
+      tctx.arcTo(-w/2, -h/2, w/2, -h/2, rr);
+      tctx.closePath();
+      tctx.fill(); tctx.stroke();
+      tctx.restore();
+    }
+  }
+  // テキスト
+  for (const el of state.elements) {
+    if (el.type === 'text') {
+      tctx.save();
+      tctx.fillStyle = el.color; tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
+      tctx.font = `${el.size*s}px ${el.font}`;
+      wrapTextHD(tctx, el.text, el.x*s, el.y*s, 240*s, el.size*1.2*s);
+      tctx.restore();
+    }
+  }
+
+  const url = tmp.toDataURL('image/png');
+  previewImg.src = url;
+  downloadLink.href = url;
+  saveResult.hidden = false;
+});
+
+function wrapTextHD(c, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(/\s+/);
+  let line = '';
+  const lines = [];
+  for (let n=0; n<words.length; n++) {
+    const testLine = line + words[n] + ' ';
+    const metrics = c.measureText(testLine);
+    if (metrics.width > maxWidth && n>0) { lines.push(line); line = words[n] + ' '; }
+    else { line = testLine; }
+  }
+  lines.push(line);
+  const offsetY = -((lines.length-1) * lineHeight) / 2;
+  lines.forEach((l, i) => c.fillText(l.trim(), x, y + offsetY + i*lineHeight));
+}
+
+// Undo/Redo
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+
+// 初期描画
+draw();

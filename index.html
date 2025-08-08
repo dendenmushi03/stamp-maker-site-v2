@@ -2,111 +2,111 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>スタンプメーカー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>スタンプメーカー（スマホ特化）</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet" />
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="icon" href="favicon.ico" />
 </head>
 <body>
-  <div class="container">
-    <div class="logo-header">
-      <img src="assets/stamp-logo.png" alt="Stamp Maker ロゴ" class="logo-image">
+  <header class="app-header">
+    <div class="brand">Stamp Maker</div>
+    <div class="header-actions">
+      <button id="undoBtn" class="icon-btn" aria-label="元に戻す">⟲</button>
+      <button id="redoBtn" class="icon-btn" aria-label="やり直す">⟳</button>
     </div>
+  </header>
 
-    <div class="divider-line"></div>
+  <main class="app-main">
+    <section class="canvas-wrap">
+  <canvas id="editorCanvas" width="300" height="300"></canvas>
+  <input id="imageUpload" type="file" accept="image/*" hidden />
+  <button id="centerUploadBtn" class="center-upload-btn">画像をアップロード</button>
+</section>
 
-    <div class="howto-button-wrapper">
-      <a href="howto.html" class="howto-button">使い方ガイド</a>
-    </div>
+    <nav class="tabbar" role="tablist">
+      <button class="tab is-active" data-tab="bubble" role="tab" aria-selected="true">吹き出し</button>
+      <button class="tab" data-tab="text" role="tab" aria-selected="false">テキスト</button>
+      <button class="tab" data-tab="style" role="tab" aria-selected="false">色</button>
+      <button class="tab" data-tab="save" role="tab" aria-selected="false">保存</button>
+    </nav>
 
-    <div class="section-title-wrapper">
-      <div class="title-line"></div>
-      <h2 class="section-title">スタンプ作成ページ</h2>
-      <div class="title-line"></div>
-    </div>
-
-    <div class="canvas-wrapper">
-      <canvas id="editorCanvas" width="300" height="300"></canvas>
-    </div>
-
-    <div class="form-group">
-      <h3>ステップ①：ベース画像を選択</h3>
-      <input type="file" id="imageUpload" accept="image/*">
-      <button id="resetImagePosition">初期位置に戻す</button>
-    </div>
-
-    <div class="form-group">
-      <h3>ステップ②：吹き出しの設置</h3>
-      <label for="bubbleShape">吹き出しの形：</label>
-<select id="bubbleShape">
-  <option value="rounded" selected>角丸</option>
-  <option value="oval">楕円</option>
-  <option value="spike1">ギザギザA</option>
-  <option value="spike2">ギザギザB</option>
-  <option value="thought1">思考バルーンA</option>
-  <option value="thought2">思考バルーンB</option>
-</select>
-      <input type="color" id="bubbleColor" value="#ffffff">
-      <button id="addBubble" class="btn btn-secondary">吹き出し追加</button>
-
-      <div class="control-row" style="margin-top:8px">
-    <label for="pointerScale">ツノの太さ/長さ（%）：</label>
-    <input id="pointerScale" type="range" min="60" max="160" value="100" step="1">
-    <span id="pointerScaleVal">100%</span>
-  </div>
-    </div>
-
-    <div class="form-group">
-      <h3>ステップ③：テキストの設置</h3>
-      <input type="text" id="textInput" placeholder="例: OK！">
-    </div>
-
-    <div class="form-group">
-      <label for="fontSelect">フォント:</label>
-      <select id="fontSelect">
-        <option value="sans-serif">ゴシック</option>
-        <option value="serif">明朝体</option>
-        <option value="cursive">手書き風</option>
-      </select>
-      <input type="color" id="textColor" value="#000000">
-      <button id="addText" class="btn btn-secondary">テキスト追加</button>
-    </div>
-
-    <div class="form-group button-group">
-      <h3>ステップ④：完成</h3>
-      <button id="saveImage" class="btn btn-primary">画像を保存</button>
-      <button id="deleteSelected" class="btn btn-danger">選択中の要素を削除</button>
-    </div>
-
-    <div class="example-section">
-      <h3>🎉 完成例 🎉</h3>
-      <img src="assets/example-stamp.png" alt="スタンプ完成例" class="example-image">
-      <img src="assets/example-stamp2.png" alt="スタンプ完成例" class="example-image">
-
-    </div>
-
-    <!-- ▼ モーダル（画像保存後に表示） -->
-    <div id="saveModal" class="modal hidden">
-      <div class="modal-content">
-        <span class="close-btn" id="closeModal">&times;</span>
-        <h3>⚠️画像はまだ保存できていません</h3>
-        <h3>画像を長押しして保存を完了してください！</h3>
-
-        <!-- 画像クリックで別タブ表示 -->
-        <img id="savedImagePreview" src="" alt="保存画像" class="modal-image" crossorigin="anonymous" style="touch-action: auto; cursor: pointer;">
-
-        <div class="modal-share">
-          <p>このスタンプをシェアする:</p>
-          <a id="modalShareX" target="_blank"><img src="assets/icon-x.png" alt="X"></a>
-          <a id="modalShareLINE" target="_blank"><img src="assets/icon-line.png" alt="LINE"></a>
-          <a id="modalShareInsta" target="_blank"><img src="assets/icon-instagram.png" alt="Instagram"></a>
-        </div>
+    <section class="panel is-active" data-panel="bubble">
+      <div class="panel-row">
+        <button class="chip" data-action="add-bubble" data-shape="round">丸</button>
+        <button class="chip" data-action="add-bubble" data-shape="rect">角丸</button>
+        <button class="chip" data-action="add-bubble" data-shape="cloud">雲</button>
+        <button class="chip" data-action="add-bubble" data-shape="thought">思考</button>
       </div>
-    </div>
+      <div class="panel-row">
+        <label class="slider-label">線の太さ
+          <input id="strokeWidth" type="range" min="2" max="20" step="1" value="6" />
+        </label>
+      </div>
+      <div class="panel-row">
+        <button id="addImageBtn" class="btn">背景画像を入れる</button>
+        <button id="randomBtn" class="btn ghost">ランダムスタイル</button>
+      </div>
+    </section>
 
-    <script src="script.js"></script>
-    
-  </div>
+    <section class="panel" data-panel="text">
+      <div class="panel-row">
+        <button id="addTextBtn" class="btn">テキスト追加</button>
+      </div>
+      <div class="panel-row">
+        <input id="textInput" class="input" type="text" placeholder="テキストを入力" />
+      </div>
+      <div class="panel-row">
+        <label class="slider-label">文字サイズ
+          <input id="fontSize" type="range" min="12" max="96" step="1" value="32" />
+        </label>
+      </div>
+      <div class="panel-row">
+        <select id="fontFamily" class="select">
+          <option value="Noto Sans JP, system-ui, sans-serif">ゴシック</option>
+          <option value="'Zen Maru Gothic', system-ui, sans-serif">丸ゴシック</option>
+          <option value="'Shippori Mincho', serif">明朝風</option>
+          <option value="'RocknRoll One', system-ui, sans-serif">手書き風</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="style">
+      <div class="panel-row">
+        <label class="color-label">塗り
+          <input id="fillColor" type="color" value="#ffffff" />
+        </label>
+        <label class="color-label">枠線
+          <input id="strokeColor" type="color" value="#000000" />
+        </label>
+        <label class="color-label">文字
+          <input id="textColor" type="color" value="#000000" />
+        </label>
+      </div>
+      <div class="panel-row">
+        <button id="toggleBgBtn" class="btn ghost">背景：透過</button>
+      </div>
+    </section>
+
+    <section class="panel" data-panel="save">
+      <div class="panel-row">
+        <label class="slider-label">出力サイズ（px）
+          <input id="exportSize" type="range" min="256" max="1024" step="64" value="300" />
+        </label>
+        <span id="exportSizeVal" class="hint">300px</span>
+      </div>
+      <div class="panel-row">
+        <button id="saveBtn" class="btn primary">画像を保存</button>
+      </div>
+      <div id="saveResult" class="save-result" hidden>
+        <img id="previewImg" alt="preview" />
+        <a id="downloadLink" class="btn" download="stamp.png">ダウンロード</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Google Fonts (軽量CDN) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=RocknRoll+One&family=Shippori+Mincho:wght@500&family=Zen+Maru+Gothic:wght@500&display=swap" rel="stylesheet">
+
+  <script src="script.js"></script>
 </body>
 </html>
