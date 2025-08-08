@@ -85,69 +85,6 @@ document.getElementById("deleteSelected").addEventListener("click", () => {
   }
 });
 
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (backgroundImage) {
-    const drawWidth = backgroundImage.width * imageScale;
-    const drawHeight = backgroundImage.height * imageScale;
-    ctx.drawImage(backgroundImage, imageX, imageY, drawWidth, drawHeight);
-  }
-  for (const el of elements) {
-    if (el.type === 'bubble') drawBubble(el);
-    if (el.type === 'text') drawText(el);
-  }
-}
-
-function drawBubble(el) {
-  ctx.save();
-  ctx.translate(el.x, el.y);
-  ctx.beginPath();
-  if (el.shape === '角丸') {
-    const r = 10;
-    ctx.moveTo(el.width - r, 0);
-    ctx.arcTo(el.width, 0, el.width, r, r);
-    ctx.arcTo(el.width, el.height, el.width - r, el.height, r);
-    ctx.arcTo(0, el.height, 0, el.height - r, r);
-    ctx.arcTo(0, 0, r, 0, r);
-  } else if (el.shape === '楕円') {
-    ctx.ellipse(el.width / 2, el.height / 2, el.width / 2, el.height / 2, 0, 0, Math.PI * 2);
-  } else if (el.shape === '雲') {
-    for (let i = 0; i < 5; i++) {
-      ctx.arc(el.width / 5 * i + 15, el.height / 2, 15, 0, Math.PI * 2);
-    }
-  } else {
-    ctx.rect(0, 0, el.width, el.height);
-  }
-  ctx.closePath();
-  ctx.fillStyle = el.color;
-  ctx.fill();
-  ctx.strokeStyle = "black";
-  ctx.stroke();
-
-  // ポインタ（ツノ）
-  const angle = el.pointerAngle;
-  const px = el.width / 2 + Math.cos(angle) * el.width / 2;
-  const py = el.height / 2 + Math.sin(angle) * el.height / 2;
-  const size = 10;
-  ctx.beginPath();
-  ctx.moveTo(px, py);
-  ctx.lineTo(px - size * Math.cos(angle - 0.5), py - size * Math.sin(angle - 0.5));
-  ctx.lineTo(px - size * Math.cos(angle + 0.5), py - size * Math.sin(angle + 0.5));
-  ctx.closePath();
-  ctx.fillStyle = "white";
-  ctx.fill();
-  ctx.stroke();
-
-  // オレンジハンドル
-  ctx.beginPath();
-  ctx.arc(px, py, 5, 0, Math.PI * 2);
-  ctx.fillStyle = "orange";
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 function drawBubbleShape(el, ctx) {
   const { x, y, w, h, shape } = el;
   ctx.beginPath();
@@ -210,6 +147,91 @@ function drawThoughtDots(ctx, x, y) {
   ctx.arc(x + 5, y + 5, 5, 0, 2 * Math.PI);
   ctx.moveTo(x + 15, y + 15);
   ctx.arc(x + 15, y + 15, 3, 0, 2 * Math.PI);
+}
+
+// 角丸とツノを一体化した Path2D を作る（rounded 専用）
+function buildRoundedWithPointerPath(el) {
+  const { x, y, w, h, pointerPosition, pointerOffset } = el;
+
+  // 角丸半径・ツノサイズ（パワポ寄せの比率）
+  const r  = Math.min(18, Math.max(6, Math.min(w, h) * 0.12));
+  const bw = Math.min(w, h) * 0.16;     // ツノの基部幅
+  const bl = bw * 0.90;                 // ツノの長さ
+
+  // ストロークのにじみ防止（0.5px に寄せる）
+  const L = Math.round(x) + 0.5;
+  const T = Math.round(y) + 0.5;
+
+  const path = new Path2D();
+  // 角丸の本体
+  if (path.roundRect) {
+    path.roundRect(L, T, w, h, r);
+  } else {
+    // roundRectが無い環境向けの予備（簡略）
+    path.moveTo(L + r, T);
+    path.lineTo(L + w - r, T);
+    path.arc(L + w - r, T + r, r, -Math.PI/2, 0);
+    path.lineTo(L + w, T + h - r);
+    path.arc(L + w - r, T + h - r, r, 0, Math.PI/2);
+    path.lineTo(L + r, T + h);
+    path.arc(L + r, T + h - r, r, Math.PI/2, Math.PI);
+    path.lineTo(L, T + r);
+    path.arc(L + r, T + r, r, Math.PI, Math.PI*1.5);
+  }
+
+  // ツノの基準位置（角の丸み分はみ出さないようにクランプ）
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const half  = bw / 2;
+  let bx, by, t1x, t1y, t2x, t2y, tipx, tipy;
+
+  switch (pointerPosition) {
+    case "top": {
+      const base = clamp(x + w * pointerOffset, x + r + half, x + w - r - half);
+      bx = Math.round(base) + 0.5; by = T;
+      t1x = bx - half; t1y = by;
+      t2x = bx + half; t2y = by;
+      tipx = bx;       tipy = by - bl;
+      break;
+    }
+    case "bottom": {
+      const base = clamp(x + w * pointerOffset, x + r + half, x + w - r - half);
+      bx = Math.round(base) + 0.5; by = T + h;
+      t1x = bx - half; t1y = by;
+      t2x = bx + half; t2y = by;
+      tipx = bx;       tipy = by + bl;
+      break;
+    }
+    case "left": {
+      const base = clamp(y + h * pointerOffset, y + r + half, y + h - r - half);
+      bx = L;          by = Math.round(base) + 0.5;
+      t1x = bx;        t1y = by - half;
+      t2x = bx;        t2y = by + half;
+      tipx = bx - bl;  tipy = by;
+      break;
+    }
+    case "right": {
+      const base = clamp(y + h * pointerOffset, y + r + half, y + h - r - half);
+      bx = L + w;      by = Math.round(base) + 0.5;
+      t1x = bx;        t1y = by - half;
+      t2x = bx;        t2y = by + half;
+      tipx = bx + bl;  tipy = by;
+      break;
+    }
+  }
+
+  // ツノ（三角形）を同じパスに追加
+  path.moveTo(t1x, t1y);
+  path.lineTo(tipx, tipy);
+  path.lineTo(t2x, t2y);
+  path.closePath();
+
+  return { path, strokeW: 1.5, radius: r };
+}
+
+// 汎用：rounded のときだけ一体パス、それ以外は null を返す
+function buildBubblePath(el) {
+  if (el.shape === "rounded") return buildRoundedWithPointerPath(el);
+  return null;
 }
 
 function drawPointer(el) {
@@ -313,14 +335,34 @@ function renderCanvas() {
 
   for (const el of elements) {
     if (el.type === "bubble") {
-      ctx.fillStyle = el.fill;
-      drawBubbleShape(el, ctx);
-      ctx.fill();
-      ctx.strokeStyle = "black";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      drawPointer(el);
-    }
+  const built = buildBubblePath(el);
+  if (built) {
+    // 一体パス（rounded 専用）
+    const { path, strokeW } = built;
+
+    // 塗りにだけ影を適用（パワポ風）
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.18)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = el.fill;
+    ctx.fill(path, "nonzero");
+    ctx.restore();
+
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = strokeW;
+    ctx.stroke(path);
+  } else {
+    // 既存形状は従来描画
+    ctx.fillStyle = el.fill;
+    drawBubbleShape(el, ctx);
+    ctx.fill();
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    drawPointer(el);
+  }
+}
 
         if (el === selectedElement && el.type === "bubble") {
       ctx.fillStyle = "blue";
@@ -501,17 +543,6 @@ function onMouseUp() {
   initialFontSize = null;
 }
 
-function getElementAt(x, y) {
-  return elements.find(el => {
-    return (
-      x > el.x &&
-      y > el.y &&
-      x < el.x + el.width &&
-      y < el.y + el.height
-    );
-  });
-}
-
 function getPointerPos(el) {
   const { x, y, w, h, pointerPosition, pointerOffset, shape } = el;
   if (shape === "oval") {
@@ -553,19 +584,33 @@ document.getElementById("saveImage").addEventListener("click", () => {
 
   for (const el of elements) {
     if (el.type === "bubble") {
-      tempCtx.fillStyle = el.fill;
-      drawBubbleShape(el, tempCtx);
-      tempCtx.fill();
-      tempCtx.strokeStyle = "black";
-      tempCtx.lineWidth = 1;
-      tempCtx.stroke();
-      drawPointerToContext(tempCtx, el);
-    } else if (el.type === "text") {
-      tempCtx.font = `${el.size || 24}px ${el.font}`;
-      tempCtx.fillStyle = el.color;
-      tempCtx.fillText(el.text, el.x, el.y);
-    }
+  const built = buildBubblePath(el);
+  if (built) {
+    const { path, strokeW } = built;
+    // 影も書き出したい場合は fill 前に shadow を設定
+    tempCtx.save();
+    tempCtx.shadowColor = "rgba(0,0,0,0.18)";
+    tempCtx.shadowBlur = 6;
+    tempCtx.shadowOffsetY = 1;
+    tempCtx.fillStyle = el.fill;
+    tempCtx.fill(path, "nonzero");
+    tempCtx.restore();
+
+    tempCtx.strokeStyle = "black";
+    tempCtx.lineWidth = strokeW;
+    tempCtx.stroke(path);
+  } else {
+    tempCtx.fillStyle = el.fill;
+    drawBubbleShape(el, tempCtx);
+    tempCtx.fill();
+    tempCtx.strokeStyle = "black";
+    tempCtx.lineWidth = 1;
+    tempCtx.stroke();
+    drawPointerToContext(tempCtx, el);
   }
+
+  // ←（テキストをここで描くならこの後に）
+}
 
   const dataURL = tempCanvas.toDataURL();
 
