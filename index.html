@@ -1,76 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>スタンプメーカー（スマホ特化）</title>
+  <title>Stamp Maker</title>
+
+  <!-- アイコンは任意。無いならこの行を消してOK -->
+  <!-- <link rel="icon" href="/favicon.ico"> -->
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" />
+
+  <script src="./script.js" defer></script>
 </head>
 <body>
   <header class="app-header">
     <div class="brand">Stamp Maker</div>
     <div class="header-actions">
-      <button id="undoBtn" class="icon-btn" aria-label="元に戻す">⟲</button>
-      <button id="redoBtn" class="icon-btn" aria-label="やり直す">⟳</button>
+    <a href="howto.html" class="btn">使い方ガイド</a>
     </div>
   </header>
 
   <main class="app-main">
+
+    <!-- キャンバス -->
     <section class="canvas-wrap">
-  <canvas id="editorCanvas" width="300" height="300"></canvas>
-  <input id="imageUpload" type="file" accept="image/*" hidden />
-  <button id="centerUploadBtn" class="center-upload-btn">画像をアップロード</button>
-</section>
+      <canvas id="editorCanvas"></canvas>
 
-    <nav class="tabbar" role="tablist">
-      <button class="tab is-active" data-tab="bubble" role="tab" aria-selected="true">吹き出し</button>
-      <button class="tab" data-tab="text" role="tab" aria-selected="false">テキスト</button>
-      <button class="tab" data-tab="style" role="tab" aria-selected="false">色</button>
-      <button class="tab" data-tab="save" role="tab" aria-selected="false">保存</button>
-    </nav>
+      <!-- 画面中央のアップロード（ラベルでもボタンでもOK） -->
+      <label id="centerUploadBtn" class="center-upload-btn" for="imageUpload">画像をアップロード</label>
 
+      <!-- 実体の file input（非表示） -->
+      <input id="imageUpload" type="file" accept="image/*" style="display:none" />
+    </section>
+
+        <!-- レイヤー一覧パネル -->
+    <aside id="layerPanel" class="layer-panel" aria-label="レイヤー">
+      <div class="layer-panel__header">
+        <span>レイヤー</span>
+        <div class="layer-panel__tools">
+          <button id="layerUpBtn" class="icon-btn" title="前面へ">⬆</button>
+          <button id="layerDownBtn" class="icon-btn" title="背面へ">⬇</button>
+          <button id="layerDelBtn" class="icon-btn" title="削除">🗑</button>
+        </div>
+      </div>
+      <ul id="layerList" class="layer-list" role="listbox" aria-label="要素一覧"></ul>
+      <div class="layer-panel__legend">
+        <span>👁 表示 / 🔒 ロック</span>
+      </div>
+    </aside>
+
+    <!-- 各種パネル（初期は「吹き出し」を表示） -->
     <section class="panel is-active" data-panel="bubble">
       <div class="panel-row">
         <button class="chip" data-action="add-bubble" data-shape="round">丸</button>
-        <button class="chip" data-action="add-bubble" data-shape="rect">角丸</button>
+<!--         <button class="chip" data-action="add-bubble" data-shape="rect">角丸</button>
         <button class="chip" data-action="add-bubble" data-shape="cloud">雲</button>
         <button class="chip" data-action="add-bubble" data-shape="thought">思考</button>
-      </div>
-      <div class="panel-row">
-        <label class="slider-label">線の太さ
-          <input id="strokeWidth" type="range" min="2" max="20" step="1" value="6" />
+ -->        <button class="tab__btn" data-action="add-bubble" data-shape="burst">ギザギザ</button>
+
+        <label class="slider-label">
+          線の太さ
+          <input id="strokeWidth" type="range" min="1" max="24" value="6" />
         </label>
-      </div>
-      <div class="panel-row">
-        <button id="addImageBtn" class="btn">背景画像を入れる</button>
-        <button id="randomBtn" class="btn ghost">ランダムスタイル</button>
+
+        <!-- <button id="deleteSelectedBtn" class="btn ghost">選択中を削除</button> -->
+<!--         <button id="toggleBgBtn" class="btn ghost">背景：透過</button>
+
+        <label class="chip">
+          <input id="tailEnabled" type="checkbox" checked style="margin-right:6px" />
+          しっぽを表示
+        </label>
+ -->        <label class="slider-label" style="min-width:160px">
+          しっぽの幅
+          <input id="tailWidth" type="range" min="8" max="80" value="28" />
+        </label>
       </div>
     </section>
 
     <section class="panel" data-panel="text">
       <div class="panel-row">
         <button id="addTextBtn" class="btn">テキスト追加</button>
-      </div>
-      <div class="panel-row">
-        <input id="textInput" class="input" type="text" placeholder="テキストを入力" />
-      </div>
-      <div class="panel-row">
-        <label class="slider-label">文字サイズ
-          <input id="fontSize" type="range" min="12" max="96" step="1" value="32" />
+        <input id="textInput" class="input" placeholder="テキストを入力" style="max-width:320px" />
+<!--         <label class="slider-label" style="min-width:160px">
+          文字サイズ
+          <input id="fontSize" type="range" min="12" max="96" value="32" />
         </label>
-      </div>
-      <div class="panel-row">
-        <select id="fontFamily" class="select">
+ -->        <select id="fontFamily" class="select">
           <option value="Noto Sans JP, system-ui, sans-serif">ゴシック</option>
-          <option value="'Zen Maru Gothic', system-ui, sans-serif">丸ゴシック</option>
-          <option value="'Shippori Mincho', serif">明朝風</option>
-          <option value="'RocknRoll One', system-ui, sans-serif">手書き風</option>
+          <option value="'Zen Maru Gothic', system-ui, sans-serif">丸ゴ</option>
+          <option value="'Shippori Mincho', serif">明朝</option>
+          <option value="'RocknRoll One', system-ui, sans-serif">ロックンロール</option>
         </select>
       </div>
     </section>
 
-    <section class="panel" data-panel="style">
+    <section class="panel" data-panel="color">
       <div class="panel-row">
         <label class="color-label">塗り
           <input id="fillColor" type="color" value="#ffffff" />
@@ -81,32 +109,64 @@
         <label class="color-label">文字
           <input id="textColor" type="color" value="#000000" />
         </label>
-      </div>
-      <div class="panel-row">
-        <button id="toggleBgBtn" class="btn ghost">背景：透過</button>
+
+        <button id="addImageBtn" class="btn">背景画像を入れる</button>
       </div>
     </section>
 
     <section class="panel" data-panel="save">
       <div class="panel-row">
-        <label class="slider-label">出力サイズ（px）
-          <input id="exportSize" type="range" min="256" max="1024" step="64" value="300" />
+        <label class="slider-label" style="min-width:220px">
+          出力サイズ（px）
+          <input id="exportSize" type="range" min="128" max="1024" value="300" />
         </label>
-        <span id="exportSizeVal" class="hint">300px</span>
-      </div>
-      <div class="panel-row">
+        <span class="chip" id="exportSizeVal">300px</span>
         <button id="saveBtn" class="btn primary">画像を保存</button>
       </div>
-      <div id="saveResult" class="save-result" hidden>
+
+      <div class="save-result" id="saveResult" hidden>
         <img id="previewImg" alt="preview" />
-        <a id="downloadLink" class="btn" download="stamp.png">ダウンロード</a>
+        <a id="downloadLink" download="stamp.png" class="btn primary">ダウンロード</a>
+        <div class="hint">※ プレビューを確認してから保存してください</div>
       </div>
     </section>
+
+    <!-- 下部タブ -->
+    <nav class="tabbar">
+      <button class="tab is-active" data-tab="bubble">吹き出し</button>
+      <button class="tab" data-tab="text">テキスト</button>
+      <!-- <button class="tab" data-tab="save">保存</button> -->
+    </nav>
+
+        <!-- いつでも押せるフローティングツール -->
+    <div class="floating-tools" aria-label="クイック操作">
+      <button id="ftUndo"   class="icon-btn" title="元に戻す">↶</button>
+      <button id="ftRedo"   class="icon-btn" title="やり直す">↷</button>
+      <button id="ftDelete" class="icon-btn" title="選択削除">🗑</button>
+      <button id="ftReset"  class="icon-btn" title="ベース画像を中央に戻す">◎</button>
+      <button id="resetBtn" class="icon-btn" title="初期状態に戻す">⟲</button>
+      <button id="resetBtn" class="icon-btn" title="保存">💾</button>
+    </div>
+
+    <!-- 追加するコード：保存モーダル -->
+<div id="saveModal" class="modal hidden">
+  <div class="modal-content">
+    <button class="close-btn" id="closeModal" aria-label="閉じる">×</button>
+    <h3>⚠️画像はまだ保存できていません</h3>
+    <h3>画像を長押しして保存を完了してください！</h3>
+
+    <!-- 画像クリックで別タブ表示（長押し保存もしやすい） -->
+    <img id="savedImagePreview" src="" alt="保存画像" class="modal-image" style="touch-action:auto;cursor:pointer;">
+    <div class="modal-share">
+  <p>このスタンプをシェアする:</p>
+  <a id="modalShareX" target="_blank"><img src="assets/icon-x.png" alt="X"></a>
+  <a id="modalShareLINE" target="_blank"><img src="assets/icon-line.png" alt="LINE"></a>
+  <a id="modalShareInsta" target="_blank"><img src="assets/icon-instagram.png" alt="Instagram"></a>
+</div>
+
+  </div>
+</div>
+
   </main>
-
-  <!-- Google Fonts (軽量CDN) -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=RocknRoll+One&family=Shippori+Mincho:wght@500&family=Zen+Maru+Gothic:wght@500&display=swap" rel="stylesheet">
-
-  <script src="script.js"></script>
 </body>
 </html>

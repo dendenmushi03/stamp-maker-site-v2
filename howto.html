@@ -3,66 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>使い方｜スタンプメーカー</title>
+  <title>使い方｜Stamp Maker</title>
+
+  <!-- index.html と同じフォント -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="style.css" />
-  <style>
-    .howto-image {
-      max-width: 100%;
-      margin-top: 16px;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    }
-  </style>
 </head>
 <body>
-  <div class="container">
-    <header class="logo-header">
-      <a href="index.html">
-        <img src="assets/stamp-logo.png" alt="スタンプメーカー ロゴ" class="logo-image" />
-      </a>
-      <div class="divider-line"></div>
-      <P></P>
+  <!-- index と同じヘッダー構造＆ロゴ（CSSでbrandに画像を当てる） -->
+  <header class="app-header">
+    <a href="index.html" class="brand">Stamp Maker</a>
+    <div class="header-actions">
+      <a href="index.html" class="btn">スタンプを作成する</a>
+    </div>
+  </header>
 
-      <div class="howto-button-wrapper">
-      <a href="index.html" class="howto-button">← スタンプを作成する</a>
+  <main class="app-main">
+    <div class="doc">
+      <div class="doc-title-wrap">
+        <div class="doc-title-line"></div>
+        <h1 class="doc-title">スタンプメーカーの使い方</h1>
+        <div class="doc-title-line"></div>
       </div>
+      <p class="doc-sub">数分でかんたんに作れます。以下の手順どおりにどうぞ。</p>
 
-    </header>
+      <section class="howto-card">
+        <h2 class="howto-h2">① 写真をアップロード</h2>
+        <p class="howto-p">「画像をアップロード」から、背景に使いたい画像を選びます。</p>
+        <img src="assets/howto-step1.png" alt="写真をアップロードの例" class="howto-image">
+      </section>
 
-    <div class="section-title-wrapper">
-  <div class="title-line"></div>
-  <h2 class="section-title">スタンプメーカーの使い方</h2>
-  <div class="title-line"></div>
+      <section class="howto-card">
+        <h2 class="howto-h2">② 吹き出しやテキストを追加</h2>
+        <p class="howto-p">吹き出しの形・色を選んで追加、またはテキストを入力して「テキスト追加」を押します。</p>
+        <img src="assets/howto-step2.png" alt="吹き出しやテキスト追加の例" class="howto-image">
+      </section>
+
+      <section class="howto-card">
+        <h2 class="howto-h2">③ 要素を自由に動かす</h2>
+        <p class="howto-p">ドラッグで移動、四隅のハンドルでサイズ変更。しっぽはオレンジの丸で角度と長さを調整できます。</p>
+        <img src="assets/howto-step3.png" alt="要素の移動やサイズ変更の例" class="howto-image">
+      </section>
+
+      <section class="howto-card">
+        <h2 class="howto-h2">④ 画像を保存してシェア</h2>
+        <p class="howto-p">右下の💾から保存モーダルを開き、画像を長押しで保存。X/LINE/Instagramにもシェアできます。</p>
+        <img src="assets/howto-step4.png" alt="画像保存とSNSシェアの例" class="howto-image">
+      </section>
+
+      <div class="howto-button-wrapper is-center">
+  <a href="index.html" class="howto-button">スタンプを作成する</a>
 </div>
 
-    <section>
-      <h2>① 写真をアップロード</h2>
-      <p>「画像を選択」ボタンから、背景に使いたい画像をアップロードしてください。</p>
-      <img src="assets/howto-step1.png" alt="写真をアップロードの例" class="howto-image" />
-    </section>
-
-    <section>
-      <h2>② 吹き出しやテキストを追加</h2>
-      <p>吹き出しの色を選んで「吹き出し追加」、またはテキストを入力して「テキスト追加」を押すことで、画像の上に要素を配置できます。</p>
-      <img src="assets/howto-step2.png" alt="吹き出しやテキスト追加の例" class="howto-image" />
-    </section>
-
-    <section>
-      <h2>③ 要素を自由に動かす</h2>
-      <p>吹き出しや文字はドラッグで移動できます。右下の青い四角をドラッグすればサイズ変更も可能です。</p>
-      <img src="assets/howto-step3.png" alt="要素の移動やサイズ変更の例" class="howto-image" />
-    </section>
-
-    <section>
-      <h2>④ 画像を保存してシェア</h2>
-      <p>「画像を保存」ボタンを押すと画像が保存され、保存完了後に表示される画面からSNSシェアも可能です。</p>
-      <img src="assets/howto-step4.png" alt="画像保存とSNSシェアの例" class="howto-image" />
-    </section>
-
-    <div class="howto-button-wrapper">
-    <a href="index.html" class="howto-button">← スタンプを作成する</a>
-    </div>
-
-  </div>
+</div>
+  </main>
 </body>
 </html>
