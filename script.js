@@ -326,14 +326,12 @@ const rightW = halfW * (1 - k);
 const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
 const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-// --- 塗り：白スジ防止（角丸は少し多めに食い込ませる）---
-// 本体側へ“向き（−ca,−sa）”で押し込む（nx/ny では隙間が出る）
-const EPS_INNER = (el.shape === 'rect') ? 1.8 : 0.8;
-const bL_in = { x: bL.x - ca*EPS_INNER, y: bL.y - sa*EPS_INNER };
-const bR_in = { x: bR.x - ca*EPS_INNER, y: bR.y - sa*EPS_INNER };
+// --- 塗り：白スジ防止（角丸は少し多めに食い込ませる） ---
+const EPS_INNER = (el.shape === 'rect') ? 1.2 : 0.5;
+const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
+const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
-tail = { bL, bR, tip, bL_in, bR_in };
-
+    tail = { bL, bR, tip };
   }
 
   // === 塗り: 本体 + しっぽを1つのパスとして fill ===
@@ -385,24 +383,8 @@ ctx.closePath();
 ctx.stroke();
 ctx.restore();
 
-  // しっぽの塗りを本体へ少し食い込ませて“接着”させる → その後、外側だけ線を引く
+  // しっぽの2辺のみを stroke（基部は描かない）＋本体の外側だけに限定
   if (tail) {
-    const EXT = 0.6;
-    const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
-    const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
-
-    // ① 未クリップで小三角形を塗る（bL_in / bR_in を使って本体側に1px程度潜り込む）
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo((tail.bL_in?.x ?? tail.bL.x), (tail.bL_in?.y ?? tail.bL.y));
-    ctx.lineTo(tipOut.x, tipOut.y);
-    ctx.lineTo((tail.bR_in?.x ?? tail.bR.x), (tail.bR_in?.y ?? tail.bR.y));
-    ctx.closePath();
-    ctx.fillStyle = el.fill;
-    ctx.fill();
-    ctx.restore();
-
-    // ② 外側だけを clip して、2辺だけを stroke（ベース側は描かない）
     ctx.save();
 
     // --- 外側クリップ（大きな矩形 − 本体形状）---
@@ -425,6 +407,20 @@ ctx.restore();
 
     ctx.clip('evenodd');
 
+    // しっぽの2辺（先端わずか延長＋白塗り→黒線）
+    const EXT = 0.6;
+    const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+    const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+
+    // 面で白く塗る（吹き出しと同色）
+    ctx.beginPath();
+    ctx.moveTo(tail.bL.x, tail.bL.y);
+    ctx.lineTo(tipOut.x,  tipOut.y);
+    ctx.lineTo(tail.bR.x, tail.bR.y);
+    ctx.closePath();
+    ctx.fillStyle = el.fill;
+    ctx.fill();
+
     // 線（2辺のみ）
     ctx.beginPath();
     ctx.moveTo(tail.bL.x, tail.bL.y);
@@ -436,9 +432,9 @@ ctx.restore();
     ctx.lineCap     = 'round';
     ctx.miterLimit  = 3;
     ctx.stroke();
-
-    ctx.restore();
+    ctx.restore(); // ← 忘れずに
   }
+} // ← ここで drawBubble が必ず閉じる
 
 // 楕円外周
 function ellipseEdgePoint(cx, cy, rx, ry, angle) {
@@ -1245,15 +1241,6 @@ function renderPNGDataURL() {
         const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
         const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
         tail = { bL, bR, tip };
-        
-
-// 本体方向（−ca,−sa）へ押し込む
-const EPS_INNER = (el.shape === 'rect') ? 1.8 * s : 0.8 * s;
-const bL_in = { x: bL.x - ca*EPS_INNER, y: bL.y - sa*EPS_INNER };
-const bR_in = { x: bR.x - ca*EPS_INNER, y: bR.y - sa*EPS_INNER };
-
-tail = { bL, bR, tip, bL_in, bR_in };
-
       }
 
       // 本体塗り
@@ -1315,57 +1302,49 @@ tail = { bL, bR, tip, bL_in, bR_in };
       tctx.stroke();
       tctx.restore();
 
-    // しっぽ（基部は描かず、外側2辺のみ表示）
-// 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
-if (tail) {
-  const EXT = 0.6 * s;
-  const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
-  const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+      // しっぽ（本体の外側だけ）
+      if (tail) {
+        const outside = new Path2D();
+        outside.rect(0, 0, tmp.width, tmp.height);
 
-  // ① 未クリップで小三角を塗る（内側点を使って本体に食い込ませる）
-  tctx.beginPath();
-  tctx.moveTo(tail.bL_in?.x ?? tail.bL.x, tail.bL_in?.y ?? tail.bL.y);
-  tctx.lineTo(tipOut.x, tipOut.y);
-  tctx.lineTo(tail.bR_in?.x ?? tail.bR.x, tail.bR_in?.y ?? tail.bR.y);
-  tctx.closePath();
-  tctx.fillStyle = el.fill;
-  tctx.fill();
+        const shape = new Path2D();
+        const ox = el.x * s, oy = el.y * s;
+        const w2 = el.w * s, h2 = el.h * s;
+        const rr2 = Math.min(18 * s, Math.min(w2, h2) / 2);
+        shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
+        shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
+        shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
+        shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
+        shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
+        shape.closePath();
 
-  // ② 外側だけ clip して2辺を stroke
-  const outside = new Path2D();
-  outside.rect(0, 0, tmp.width, tmp.height);
+        const clipPath = new Path2D();
+        clipPath.addPath(outside);
+        clipPath.addPath(shape);
 
-  const shape = new Path2D();
-  const ox = el.x * s, oy = el.y * s;
-  const w2 = el.w * s, h2 = el.h * s;
-  const rr2 = Math.min(18 * s, Math.min(w2, h2) / 2);
-  shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
-  shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
-  shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
-  shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
-  shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
-  shape.closePath();
+        tctx.save();
+        tctx.clip(clipPath, 'evenodd');
 
-  const clipPath = new Path2D();
-  clipPath.addPath(outside);
-  clipPath.addPath(shape);
+        const EXT = 0.6 * s;
+        const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+        const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
-  tctx.save();
-  tctx.clip(clipPath, 'evenodd');
+        tctx.beginPath();
+        tctx.moveTo(tail.bL.x, tail.bL.y);
+        tctx.lineTo(tipOut.x,  tipOut.y);
+        tctx.lineTo(tail.bR.x, tail.bR.y);
+        tctx.closePath();
+        tctx.fillStyle = el.fill;
+        tctx.fill();
 
-  tctx.beginPath();
-  tctx.moveTo(tail.bL.x, tail.bL.y);
-  tctx.lineTo(tipOut.x,  tipOut.y);
-  tctx.lineTo(tail.bR.x, tail.bR.y);
-  tctx.strokeStyle = el.stroke;
-  tctx.lineWidth   = el.strokeW * s;
-  tctx.lineJoin    = 'round';
-  tctx.lineCap     = 'round';
-  tctx.miterLimit  = 2.5;
-  tctx.stroke();
-  tctx.restore();
-}
-      
+        tctx.strokeStyle = el.stroke;
+        tctx.lineWidth   = el.strokeW * s;
+        tctx.lineJoin    = 'round';
+        tctx.lineCap     = 'round';
+        tctx.miterLimit  = 2.5;
+        tctx.stroke();
+        tctx.restore();
+      }
     }
 
     // テキスト
@@ -1452,13 +1431,6 @@ if (tail) {
       const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
       const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
       tail = { bL, bR, tip };
-
-const EPS_INNER = (el.shape === 'rect') ? 1.8 * s : 0.8 * s;
-const bL_in = { x: bL.x - ca*EPS_INNER, y: bL.y - sa*EPS_INNER };
-const bR_in = { x: bR.x - ca*EPS_INNER, y: bR.y - sa*EPS_INNER };
-
-tail = { bL, bR, tip, bL_in, bR_in };
-
     }
 
     // 本体塗り
@@ -1552,57 +1524,50 @@ tail = { bL, bR, tip, bL_in, bR_in };
     tctx.stroke();
     tctx.restore();
 
-  // しっぽ（基部は描かず、外側2辺のみ表示）
-// 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
-if (tail) {
-  const EXT = 0.6 * s;
-  const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
-  const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+    // しっぽの2辺（本体外側のみ）
+    if (tail) {
+      const outside = new Path2D();
+      outside.rect(0, 0, tmp.width, tmp.height);
 
-  // ① 未クリップで小三角を塗る（内側点を使って本体に食い込ませる）
-  tctx.beginPath();
-  tctx.moveTo(tail.bL_in?.x ?? tail.bL.x, tail.bL_in?.y ?? tail.bL.y);
-  tctx.lineTo(tipOut.x, tipOut.y);
-  tctx.lineTo(tail.bR_in?.x ?? tail.bR.x, tail.bR_in?.y ?? tail.bR.y);
-  tctx.closePath();
-  tctx.fillStyle = el.fill;
-  tctx.fill();
+      const shape = new Path2D();
+      // 角丸（代表ケース）だけでもクリップが効く
+      const ox = el.x * s, oy = el.y * s;
+      const w2 = el.w * s, h2 = el.h * s;
+      const rr2 = Math.min(RECT_R * s, Math.min(w2, h2) / 2);
+      shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
+      shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
+      shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
+      shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
+      shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
+      shape.closePath();
 
-  // ② 外側だけ clip して2辺を stroke
-  const outside = new Path2D();
-  outside.rect(0, 0, tmp.width, tmp.height);
+      const clipPath = new Path2D();
+      clipPath.addPath(outside);
+      clipPath.addPath(shape);
 
-  const shape = new Path2D();
-  const ox = el.x * s, oy = el.y * s;
-  const w2 = el.w * s, h2 = el.h * s;
-  const rr2 = Math.min(RECT_R * s, Math.min(w2, h2) / 2);
-  shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
-  shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
-  shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
-  shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
-  shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
-  shape.closePath();
+      tctx.save();
+      tctx.clip(clipPath, 'evenodd');
 
-  const clipPath = new Path2D();
-  clipPath.addPath(outside);
-  clipPath.addPath(shape);
+      const EXT = 0.6 * s;
+      const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+      const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
-  tctx.save();
-  tctx.clip(clipPath, 'evenodd');
+      tctx.beginPath();
+      tctx.moveTo(tail.bL.x, tail.bL.y);
+      tctx.lineTo(tipOut.x,  tipOut.y);
+      tctx.lineTo(tail.bR.x, tail.bR.y);
+      tctx.closePath();
+      tctx.fillStyle = el.fill;
+      tctx.fill();
 
-  tctx.beginPath();
-  tctx.moveTo(tail.bL.x, tail.bL.y);
-  tctx.lineTo(tipOut.x,  tipOut.y);
-  tctx.lineTo(tail.bR.x, tail.bR.y);
-  tctx.strokeStyle = el.stroke;
-  tctx.lineWidth   = el.strokeW * s;
-  tctx.lineJoin    = 'round';
-  tctx.lineCap     = 'round';
-  tctx.miterLimit  = 2.5;
-  tctx.stroke();
-  tctx.restore();
-}
-
+      tctx.strokeStyle = el.stroke;
+      tctx.lineWidth   = el.strokeW * s;
+      tctx.lineJoin    = 'round';
+      tctx.lineCap     = 'round';
+      tctx.miterLimit  = 2.5;
+      tctx.stroke();
+      tctx.restore();
+    }
   }
 
   // ===== テキスト層 =====
