@@ -461,6 +461,7 @@ html, body {
 }
 
 /* .tab__btn（burst用）も同じ見た目に揃える */
+.tab__btn[data-action="add-bubble"]{ ...同等の見た目... }
 .tab__btn[data-action="add-bubble"]:hover{ ... }
 .tab__btn[data-action="add-bubble"]:active{ ... }
 .tab__btn[data-action="add-bubble"]:focus{ ... }
@@ -656,16 +657,6 @@ html, body {
   margin: 24px 0 40px;       /* 余白も少し広めに */
 }
 
-.howto-button-wrapper.is-right{
-  justify-content: flex-end;
-  margin: 18px 0 8px;
-}
-
-/* 装飾のぶつかり対策（下線やautoマージンを打ち消し） */
-.howto-button{
-  text-decoration: none !important;
-  margin-left: 0 !important;
-}
 
 /* モバイルで少しだけ小ぶりに */
 @media (max-width: 480px){
@@ -678,59 +669,5 @@ html, body {
   .app-header .header-actions a::before,
   .howto-button::before{
     width: 20px; height: 20px;
-  }
-}
-
-/* PCなどは300、スマホは200で表示 */
-#editorCanvas{
-  width: 200px;
-  height: 200px;
-  display: block;          /* 余計な伸縮を防ぐ */
-  margin: 0;               /* お好みで中央寄せしたいなら margin: 0 auto; */
-}
-@media (max-width: 480px){
-  #editorCanvas{
-    width: 200px;
-    height: 200px;
-  }
-}
-
-/* もしキャンバスを囲うDIVが幅100%で広がっていたら、そのDIVに
-   クラス名を1つ付けて（例: .canvas-area）、以下も入れておくと確実 */
-.canvas-area{ width: fit-content; }
-@media (max-width: 480px){
-  .canvas-area{ width: 200px; }
-}
-
-/* ===== スマホ：キャンバス表示を 200x200 に固定 ===== */
-@media (max-width: 480px){
-  #editorCanvas{
-    width: 200px !important;
-    height: 200px !important;
-    display: block;
-    margin: 0;              /* 中央寄せしたいなら → margin: 0 auto; */
-  }
-
-  /* キャンバスの外側ボックスが幅を持っている場合に備えて縮める */
-  .canvas-area,
-  .canvas-wrapper,
-  .editor-board,
-  .board,
-  .canvas-frame{
-    max-width: 200px !important;
-    width: 200px !important;
-  }
-
-  /* 右の丸ボタンがキャンバスに被る場合は、右側に並べる */
-  .app-main{
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    align-items: flex-start;
-  }
-  .floating-tools{
-    position: relative !important; /* 固定配置している場合は解除 */
-    inset: auto !important;
-    transform: none !important;
   }
 }
