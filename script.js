@@ -7,7 +7,7 @@ console.log('BUILD MARKER ZZZ5');
 const canvas = document.getElementById('editorCanvas');
 const ctx = canvas.getContext('2d');
 let bgTransparent = true;
-let exportSize = 300;
+let exportSize = 200;
 
 // ---- デフォルト（スマホ見栄え寄り） ----
 const DEFAULTS = {
@@ -32,8 +32,8 @@ window.addEventListener('resize', () => {
 }, { passive: true });
 
 // 論理サイズは 300x300 固定（見た目はCSSで拡大）
-canvas.width = 300;
-canvas.height = 300;
+canvas.width = 200;
+canvas.height = 200;
 
 // 角丸長方形の統一半径（描画・ヒット・書き出しで共通）
 const RECT_R = 18;
@@ -157,7 +157,7 @@ function loadLocal(){
     if (!s) return;
     const parsed = JSON.parse(s);
     bgTransparent = !!parsed.bgTransparent;
-    exportSize = parsed.exportSize || 300;
+    exportSize = parsed.exportSize || 200;
     state.elements = reviveElements(parsed.elements || []);
     state.selectedId = state.elements.at(-1)?.id || null;
   } catch(e){
@@ -178,7 +178,7 @@ function addBubble(shape = 'round') {
   const el = {
     id: genId(),
     type: 'bubble',
-    shape, x: 150, y: 150, w: 200, h: 140,
+    shape, x: canvas.width / 2, y: canvas.height / 2, w: 150, h: 110,
     hidden: false, locked: false,
     fill: document.getElementById('fillColor').value,
     stroke: document.getElementById('strokeColor').value,
@@ -287,7 +287,7 @@ function resetAll() {
 
   // 初期UI値（必要なら調整）
   bgTransparent = true;
-  exportSize = 300;
+  exportSize = 200;
 
   // 中央のアップロードボタンを再表示
   const btn = document.getElementById('centerUploadBtn');
@@ -326,12 +326,14 @@ const rightW = halfW * (1 - k);
 const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
 const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-// --- 塗り：白スジ防止（角丸は少し多めに食い込ませる） ---
-const EPS_INNER = (el.shape === 'rect') ? 1.2 : 0.5;
-const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
-const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
+// --- 塗り：白スジ防止（角丸は少し多めに食い込ませる）---
+// 本体側へ“向き（−ca,−sa）”で押し込む（nx/ny では隙間が出る）
+const EPS_INNER = (el.shape === 'rect') ? 1.8 : 0.8;
+const bL_in = { x: bL.x - ca*EPS_INNER, y: bL.y - sa*EPS_INNER };
+const bR_in = { x: bR.x - ca*EPS_INNER, y: bR.y - sa*EPS_INNER };
 
-    tail = { bL, bR, tip };
+tail = { bL, bR, tip, bL_in, bR_in };
+
   }
 
   // === 塗り: 本体 + しっぽを1つのパスとして fill ===
@@ -383,8 +385,24 @@ ctx.closePath();
 ctx.stroke();
 ctx.restore();
 
-  // しっぽの2辺のみを stroke（基部は描かない）＋本体の外側だけに限定
+  // しっぽの塗りを本体へ少し食い込ませて“接着”させる → その後、外側だけ線を引く
   if (tail) {
+    const EXT = 0.6;
+    const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+    const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+
+    // ① 未クリップで小三角形を塗る（bL_in / bR_in を使って本体側に1px程度潜り込む）
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo((tail.bL_in?.x ?? tail.bL.x), (tail.bL_in?.y ?? tail.bL.y));
+    ctx.lineTo(tipOut.x, tipOut.y);
+    ctx.lineTo((tail.bR_in?.x ?? tail.bR.x), (tail.bR_in?.y ?? tail.bR.y));
+    ctx.closePath();
+    ctx.fillStyle = el.fill;
+    ctx.fill();
+    ctx.restore();
+
+    // ② 外側だけを clip して、2辺だけを stroke（ベース側は描かない）
     ctx.save();
 
     // --- 外側クリップ（大きな矩形 − 本体形状）---
@@ -407,20 +425,6 @@ ctx.restore();
 
     ctx.clip('evenodd');
 
-    // しっぽの2辺（先端わずか延長＋白塗り→黒線）
-    const EXT = 0.6;
-    const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
-    const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
-
-    // 面で白く塗る（吹き出しと同色）
-    ctx.beginPath();
-    ctx.moveTo(tail.bL.x, tail.bL.y);
-    ctx.lineTo(tipOut.x,  tipOut.y);
-    ctx.lineTo(tail.bR.x, tail.bR.y);
-    ctx.closePath();
-    ctx.fillStyle = el.fill;
-    ctx.fill();
-
     // 線（2辺のみ）
     ctx.beginPath();
     ctx.moveTo(tail.bL.x, tail.bL.y);
@@ -432,9 +436,9 @@ ctx.restore();
     ctx.lineCap     = 'round';
     ctx.miterLimit  = 3;
     ctx.stroke();
-    ctx.restore(); // ← 忘れずに
+
+    ctx.restore();
   }
-} // ← ここで drawBubble が必ず閉じる
 
 // 楕円外周
 function ellipseEdgePoint(cx, cy, rx, ry, angle) {
@@ -1147,23 +1151,248 @@ document.getElementById('resetBtn')?.addEventListener('click', () => {
   if (confirm('初期状態に戻しますか？')) resetAll();
 });
 
-// ====== 保存（300px固定 & モーダル） ======
-const EXPORT_SIZE = 300;
+// ====== 保存（背景画像サイズにトリミングして出力） ======
+const EXPORT_SIZE = 200; // ← 背景画像がない時のフォールバック
 
 function renderPNGDataURL() {
+  // 1) 一番下の「背景画像（image要素）」を探す
+  const baseImgEl = state.elements.find(e => e.type === 'image' && !e.hidden && e.img);
+  if (baseImgEl && (baseImgEl.img.naturalWidth || baseImgEl.img.width)) {
+    const iw = baseImgEl.img.naturalWidth || baseImgEl.img.width;
+    const ih = baseImgEl.img.naturalHeight || baseImgEl.img.height;
+
+    // キャンバス座標 → 書き出しピクセルの拡大率
+    const s = iw / baseImgEl.w; // (= ih / baseImgEl.h と同じ)
+
+    // 出力キャンバスは「背景画像そのものの大きさ」
+    const outW = Math.round(baseImgEl.w * s); // = iw
+    const outH = Math.round(baseImgEl.h * s); // = ih
+
+    const tmp = document.createElement('canvas');
+    tmp.width = outW;
+    tmp.height = outH;
+    const tctx = tmp.getContext('2d');
+
+    // 背景（白/透過）— ここでは“トリミングされた範囲”だけ塗る
+    if (!bgTransparent) {
+      tctx.fillStyle = '#ffffff';
+      tctx.fillRect(0, 0, outW, outH);
+    }
+
+    // 2) 画面上の「背景画像の左上」が (0,0) に来るよう全体をオフセット
+    //    以降は「いつものエクスポート描画」を実行するだけで、
+    //    背景画像の範囲でぴったり切り出されます。
+    const cropLeft  = (baseImgEl.x - baseImgEl.w / 2) * s;
+    const cropTop   = (baseImgEl.y - baseImgEl.h / 2) * s;
+    tctx.translate(-cropLeft, -cropTop);
+
+    // ====== ここからは従来の描画処理（s を使う） ======
+    // 画像レイヤー
+    for (const el of state.elements) {
+      if (el.type === 'image' && !el.hidden) {
+        tctx.drawImage(
+          el.img,
+          (el.x - el.w / 2) * s,
+          (el.y - el.h / 2) * s,
+          el.w * s,
+          el.h * s
+        );
+      }
+    }
+
+    // 吹き出しレイヤー（元の export と同じロジックで s を使う）
+    for (const el of state.elements) {
+      if (el.type !== 'bubble' || el.hidden) continue;
+
+      const w = el.w * s, h = el.h * s;
+
+      // しっぽ計算（爆発/思考の扱いは元のまま）
+      let tail = null;
+      if (el.tail && el.tail.enabled && el.shape !== 'thought') {
+        const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+        let edgeBase;
+        if (el.shape === 'rect') {
+          // 角丸長方形の外周交点（元コード準拠）
+          const r = 18 * s;
+          let t0 = 0, t1 = Math.max(el.w, el.h) * s;
+          const sdfRR = (px, py, W, H, R) => {
+            const qx = Math.abs(px) - (W/2 - R);
+            const qy = Math.abs(py) - (H/2 - R);
+            const qx2 = Math.max(qx, 0), qy2 = Math.max(qy, 0);
+            return Math.hypot(qx2, qy2) + Math.min(Math.max(qx, qy), 0) - R;
+          };
+          for (let i = 0; i < 22; i++) {
+            const tm = (t0 + t1) / 2, px = tm * ca, py = tm * sa;
+            const d = sdfRR(px, py, el.w * s, el.h * s, r);
+            if (d > 0) t1 = tm; else t0 = tm;
+          }
+          const t = (t0 + t1) / 2;
+          edgeBase = { x: el.x * s + t * ca, y: el.y * s + t * sa };
+        } else {
+          const rx = (el.w / 2) * s, ry = (el.h / 2) * s;
+          const t = 1 / Math.sqrt((ca * ca) / (rx * rx) + (sa * sa) / (ry * ry));
+          edgeBase = { x: el.x * s + t * ca, y: el.y * s + t * sa };
+        }
+        const tip = {
+          x: edgeBase.x + (el.tail.length * s) * ca,
+          y: edgeBase.y + (el.tail.length * s) * sa
+        };
+        const nx = -sa, ny = ca;
+        const halfW = (el.tail.width * s) / 2;
+        const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
+        const leftW = halfW * (1 + k);
+        const rightW = halfW * (1 - k);
+        const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
+        const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
+        tail = { bL, bR, tip };
+        
+
+// 本体方向（−ca,−sa）へ押し込む
+const EPS_INNER = (el.shape === 'rect') ? 1.8 * s : 0.8 * s;
+const bL_in = { x: bL.x - ca*EPS_INNER, y: bL.y - sa*EPS_INNER };
+const bR_in = { x: bR.x - ca*EPS_INNER, y: bR.y - sa*EPS_INNER };
+
+tail = { bL, bR, tip, bL_in, bR_in };
+
+      }
+
+      // 本体塗り
+      tctx.save();
+      tctx.fillStyle = el.fill;
+      tctx.translate(el.x * s, el.y * s);
+      tctx.beginPath();
+      const drawRR = (W, H, R) => {
+        const rr = Math.min(R, Math.min(W, H) / 2);
+        tctx.moveTo(-W/2 + rr, -H/2);
+        tctx.arcTo(W/2, -H/2,  W/2,  H/2, rr);
+        tctx.arcTo(W/2,  H/2, -W/2,  H/2, rr);
+        tctx.arcTo(-W/2, H/2, -W/2, -H/2, rr);
+        tctx.arcTo(-W/2, -H/2,  W/2, -H/2, rr);
+        tctx.closePath();
+      };
+      if (el.shape === 'rect') drawRR(w, h, 18 * s);
+      else if (el.shape === 'burst') {
+        const spikes = 12, R = Math.min(w, h) * 0.50, r = R * 0.62;
+        const step = (Math.PI * 2) / (spikes * 2);
+        tctx.moveTo(R, 0);
+        for (let i = 1; i < spikes * 2; i++) {
+          const ang = i * step;
+          const rad = (i % 2 === 0) ? R : r;
+          tctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+        }
+        tctx.closePath();
+      } else {
+        drawRR(w, h, Math.min(w, h) / 2);
+      }
+      tctx.fill();
+      tctx.restore();
+
+      // 外枠線
+      tctx.save();
+      tctx.translate(el.x * s, el.y * s);
+      tctx.strokeStyle = el.stroke;
+      tctx.lineWidth = el.strokeW * s;
+      tctx.lineJoin = 'miter';
+      tctx.lineCap = 'round';
+      tctx.miterLimit = 3;
+
+      tctx.beginPath();
+      if (el.shape === 'rect') {
+        drawRR(w, h, 18 * s);
+      } else if (el.shape === 'burst') {
+        const spikes = 12, R = Math.min(w, h) * 0.50, r = R * 0.62;
+        const step = (Math.PI * 2) / (spikes * 2);
+        tctx.moveTo(R, 0);
+        for (let i = 1; i < spikes * 2; i++) {
+          const ang = i * step;
+          const rad = (i % 2 === 0) ? R : r;
+          tctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+        }
+        tctx.closePath();
+      } else {
+        drawRR(w, h, Math.min(w, h) / 2);
+      }
+      tctx.stroke();
+      tctx.restore();
+
+    // しっぽ（基部は描かず、外側2辺のみ表示）
+// 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
+if (tail) {
+  const EXT = 0.6 * s;
+  const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+  const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+
+  // ① 未クリップで小三角を塗る（内側点を使って本体に食い込ませる）
+  tctx.beginPath();
+  tctx.moveTo(tail.bL_in?.x ?? tail.bL.x, tail.bL_in?.y ?? tail.bL.y);
+  tctx.lineTo(tipOut.x, tipOut.y);
+  tctx.lineTo(tail.bR_in?.x ?? tail.bR.x, tail.bR_in?.y ?? tail.bR.y);
+  tctx.closePath();
+  tctx.fillStyle = el.fill;
+  tctx.fill();
+
+  // ② 外側だけ clip して2辺を stroke
+  const outside = new Path2D();
+  outside.rect(0, 0, tmp.width, tmp.height);
+
+  const shape = new Path2D();
+  const ox = el.x * s, oy = el.y * s;
+  const w2 = el.w * s, h2 = el.h * s;
+  const rr2 = Math.min(18 * s, Math.min(w2, h2) / 2);
+  shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
+  shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
+  shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
+  shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
+  shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
+  shape.closePath();
+
+  const clipPath = new Path2D();
+  clipPath.addPath(outside);
+  clipPath.addPath(shape);
+
+  tctx.save();
+  tctx.clip(clipPath, 'evenodd');
+
+  tctx.beginPath();
+  tctx.moveTo(tail.bL.x, tail.bL.y);
+  tctx.lineTo(tipOut.x,  tipOut.y);
+  tctx.lineTo(tail.bR.x, tail.bR.y);
+  tctx.strokeStyle = el.stroke;
+  tctx.lineWidth   = el.strokeW * s;
+  tctx.lineJoin    = 'round';
+  tctx.lineCap     = 'round';
+  tctx.miterLimit  = 2.5;
+  tctx.stroke();
+  tctx.restore();
+}
+      
+    }
+
+    // テキスト
+    for (const el of state.elements) {
+      if (el.type !== 'text' || el.hidden) continue;
+      tctx.save();
+      tctx.fillStyle   = el.color;
+      tctx.textAlign   = 'center';
+      tctx.textBaseline= 'middle';
+      tctx.font        = `${el.size * s}px ${el.font}`;
+      wrapTextHD(tctx, el.text, el.x * s, el.y * s, 240 * s, el.size * 1.2 * s);
+      tctx.restore();
+    }
+
+    return tmp.toDataURL('image/png');
+  }
+
+  // 3) 背景画像が無ければ、従来通りの 300×300 正方形で出力
   const tmp = document.createElement('canvas');
   tmp.width = EXPORT_SIZE;
   tmp.height = EXPORT_SIZE;
   const tctx = tmp.getContext('2d');
-
-  // 背景（透過/白）
   if (!bgTransparent) {
     tctx.fillStyle = '#ffffff';
     tctx.fillRect(0, 0, tmp.width, tmp.height);
   }
-
-  // キャンバス→書き出しのスケール（論理300→出力300で 1）
-  const s = EXPORT_SIZE / canvas.width; // = 1 だが今後拡張に備えて残す
+  const s = EXPORT_SIZE / canvas.width;
 
   // ===== 画像層 =====
   for (const el of state.elements) {
@@ -1223,6 +1452,13 @@ function renderPNGDataURL() {
       const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
       const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
       tail = { bL, bR, tip };
+
+const EPS_INNER = (el.shape === 'rect') ? 1.8 * s : 0.8 * s;
+const bL_in = { x: bL.x - ca*EPS_INNER, y: bL.y - sa*EPS_INNER };
+const bR_in = { x: bR.x - ca*EPS_INNER, y: bR.y - sa*EPS_INNER };
+
+tail = { bL, bR, tip, bL_in, bR_in };
+
     }
 
     // 本体塗り
@@ -1316,50 +1552,57 @@ function renderPNGDataURL() {
     tctx.stroke();
     tctx.restore();
 
-    // しっぽの2辺（本体外側のみ）
-    if (tail) {
-      const outside = new Path2D();
-      outside.rect(0, 0, tmp.width, tmp.height);
+  // しっぽ（基部は描かず、外側2辺のみ表示）
+// 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
+if (tail) {
+  const EXT = 0.6 * s;
+  const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+  const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
-      const shape = new Path2D();
-      // 角丸（代表ケース）だけでもクリップが効く
-      const ox = el.x * s, oy = el.y * s;
-      const w2 = el.w * s, h2 = el.h * s;
-      const rr2 = Math.min(RECT_R * s, Math.min(w2, h2) / 2);
-      shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
-      shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
-      shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
-      shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
-      shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
-      shape.closePath();
+  // ① 未クリップで小三角を塗る（内側点を使って本体に食い込ませる）
+  tctx.beginPath();
+  tctx.moveTo(tail.bL_in?.x ?? tail.bL.x, tail.bL_in?.y ?? tail.bL.y);
+  tctx.lineTo(tipOut.x, tipOut.y);
+  tctx.lineTo(tail.bR_in?.x ?? tail.bR.x, tail.bR_in?.y ?? tail.bR.y);
+  tctx.closePath();
+  tctx.fillStyle = el.fill;
+  tctx.fill();
 
-      const clipPath = new Path2D();
-      clipPath.addPath(outside);
-      clipPath.addPath(shape);
+  // ② 外側だけ clip して2辺を stroke
+  const outside = new Path2D();
+  outside.rect(0, 0, tmp.width, tmp.height);
 
-      tctx.save();
-      tctx.clip(clipPath, 'evenodd');
+  const shape = new Path2D();
+  const ox = el.x * s, oy = el.y * s;
+  const w2 = el.w * s, h2 = el.h * s;
+  const rr2 = Math.min(RECT_R * s, Math.min(w2, h2) / 2);
+  shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
+  shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
+  shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
+  shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
+  shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
+  shape.closePath();
 
-      const EXT = 0.6 * s;
-      const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
-      const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+  const clipPath = new Path2D();
+  clipPath.addPath(outside);
+  clipPath.addPath(shape);
 
-      tctx.beginPath();
-      tctx.moveTo(tail.bL.x, tail.bL.y);
-      tctx.lineTo(tipOut.x,  tipOut.y);
-      tctx.lineTo(tail.bR.x, tail.bR.y);
-      tctx.closePath();
-      tctx.fillStyle = el.fill;
-      tctx.fill();
+  tctx.save();
+  tctx.clip(clipPath, 'evenodd');
 
-      tctx.strokeStyle = el.stroke;
-      tctx.lineWidth   = el.strokeW * s;
-      tctx.lineJoin    = 'round';
-      tctx.lineCap     = 'round';
-      tctx.miterLimit  = 2.5;
-      tctx.stroke();
-      tctx.restore();
-    }
+  tctx.beginPath();
+  tctx.moveTo(tail.bL.x, tail.bL.y);
+  tctx.lineTo(tipOut.x,  tipOut.y);
+  tctx.lineTo(tail.bR.x, tail.bR.y);
+  tctx.strokeStyle = el.stroke;
+  tctx.lineWidth   = el.strokeW * s;
+  tctx.lineJoin    = 'round';
+  tctx.lineCap     = 'round';
+  tctx.miterLimit  = 2.5;
+  tctx.stroke();
+  tctx.restore();
+}
+
   }
 
   // ===== テキスト層 =====
