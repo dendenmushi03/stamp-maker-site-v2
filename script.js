@@ -798,7 +798,16 @@ function hitTailBaseHandle(x, y, el) {
 
 let resizing = false;
 let activeHandle = null;
-const MIN_W = 60, MIN_H = 40;
+
+// 最小サイズを線の太さに応じて可変に（小さくもできる）
+function getMinW(el){
+  const sw = (el?.strokeW ?? DEFAULTS.STROKE_W);
+  return Math.max(22, sw * 2 + 8);   // 22pxを下限に、線の太さ×2 + 余白
+}
+function getMinH(el){
+  const sw = (el?.strokeW ?? DEFAULTS.STROKE_W);
+  return Math.max(18, sw * 2 + 6);   // 18pxを下限に、線の太さ×2 + 余白
+}
 
 function pointerPos(evt) {
   const rect = canvas.getBoundingClientRect();
@@ -851,16 +860,17 @@ canvas.addEventListener('pointermove', (e) => {
     const [a,b] = [...activePointers.values()];
     const d = distance(a,b);
     const scale = Math.max(0.3, Math.min(4, d / pinchStartDist));
-    if (sel.type === 'text') {
-      sel.size = Math.max(12, Math.round(pinchStart.size * scale));
-    } else {
-      sel.w = Math.max(MIN_W, Math.round(pinchStart.w * scale));
-      sel.h = Math.max(MIN_H, Math.round(pinchStart.h * scale));
-      if (sel.tail) {
-        sel.tail.length = Math.max(12, Math.round(sel.tail.length * scale));
-        sel.tail.width  = Math.max(8,  Math.round(sel.tail.width  * scale));
-      }
-    }
+if (sel.type === 'text') {
+  sel.size = Math.max(12, Math.round(pinchStart.size * scale));
+} else {
+  const minW = getMinW(sel), minH = getMinH(sel);
+  sel.w = Math.max(minW, Math.round(pinchStart.w * scale));
+  sel.h = Math.max(minH, Math.round(pinchStart.h * scale));
+  if (sel.tail) {
+    sel.tail.length = Math.max(12, Math.round(sel.tail.length * scale));
+    sel.tail.width  = Math.max(8,  Math.round(sel.tail.width  * scale));
+  }
+}
     draw();
   }
 }, LISTENER_OPT);
@@ -928,9 +938,11 @@ if (resizing && activeHandle) {
     draw();
     return;
   } else {
-    let newW = Math.max(MIN_W, Math.abs(x - sel.x) * 2);
-    let newH = Math.max(MIN_H, Math.abs(y - sel.y) * 2);
-    sel.w = newW; sel.h = newH;
+    const minW = getMinW(sel), minH = getMinH(sel);
+let newW = Math.max(minW, Math.abs(x - sel.x) * 2);
+let newH = Math.max(minH, Math.abs(y - sel.y) * 2);
+sel.w = newW; sel.h = newH;
+
     draw();
     return;
   }
