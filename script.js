@@ -330,12 +330,14 @@ const rightW = halfW * (1 - k);
 const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
 const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-// --- 塗り：白スジ防止（線幅に応じて十分食い込ませる） ---
-const EPS_INNER = Math.max(1, el.strokeW * 0.6); // ← 線幅の60%分 内側へ
+// --- 白スジ防止：線幅に応じてしっかり食い込ませる ---
+const EPS_INNER = Math.max(1, el.strokeW * 1.05);
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
-tail = { bL, bR, tip, bL_in, bR_in };
+// 交点をあとで使うため base を持たせる
+tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
+
   }
 
   // === 塗り: 本体 + しっぽを1つのパスとして fill ===
@@ -443,6 +445,14 @@ ctx.miterLimit  = 3;
 ctx.stroke();
 
     ctx.restore();
+    // 交点パッチ
+ctx.save();
+ctx.fillStyle = el.stroke;
+ctx.beginPath();
+ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.55), 0, Math.PI*2);
+ctx.fill();
+ctx.restore();
+
   }
 
 } // ← ここで drawBubble が必ず閉じる
@@ -1265,11 +1275,11 @@ function renderPNGDataURL() {
         const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
         const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
         tail = { bL, bR, tip };
-        const EPS_INNER = Math.max(1, el.strokeW * 0.6) * s;
+        const EPS_INNER = Math.max(1, el.strokeW * 1.05) * s;
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
-tail = { bL, bR, tip, bL_in, bR_in };
+tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
 
       }
 
@@ -1309,7 +1319,7 @@ tail = { bL, bR, tip, bL_in, bR_in };
       tctx.translate(el.x * s, el.y * s);
       tctx.strokeStyle = el.stroke;
       tctx.lineWidth = el.strokeW * s;
-      tctx.lineJoin = 'miter';
+      tctx.lineJoin = 'round';
       tctx.lineCap = 'round';
       tctx.miterLimit = 3;
 
@@ -1381,6 +1391,12 @@ if (tail) {
   tctx.miterLimit  = 2.5;
   tctx.stroke();
   tctx.restore();
+     tctx.save();
+    tctx.fillStyle = el.stroke;
+    tctx.beginPath();
+    tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.55) * s, 0, Math.PI * 2);
+    tctx.fill();
+    tctx.restore();
 }
 
     }
@@ -1469,11 +1485,11 @@ if (tail) {
       const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
       const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
       tail = { bL, bR, tip };
-      const EPS_INNER = Math.max(1, el.strokeW * 0.6) * s;
+      const EPS_INNER = Math.max(1, el.strokeW * 1.05) * s;
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
-tail = { bL, bR, tip, bL_in, bR_in };
+tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
 
     }
 
@@ -1617,6 +1633,14 @@ if (tail) {
   tctx.miterLimit  = 2.5;
   tctx.stroke();
   tctx.restore();
+
+  tctx.save();
+  tctx.fillStyle = el.stroke;
+  tctx.beginPath();
+  tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.55) * s, 0, Math.PI*2);
+  tctx.fill();
+  tctx.restore();
+
 }
 
   }
