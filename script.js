@@ -1660,7 +1660,34 @@ if (tail) {
   return tmp.toDataURL('image/png');
 }
 
-// 右の丸ボタン「保存」―――――――――――――――――――― ここから差し替え
+// ===== Web Share（画像ファイルを共有）ヘルパー =====
+function dataURLtoBlob(dataURL) {
+  const [head, body] = dataURL.split(',');
+  const mime = head.match(/data:(.*?);base64/)[1];
+  const bin = atob(body);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Blob([u8], { type: mime });
+}
+
+async function shareImageFile(shareText, dataUrl, fallbackUrl) {
+  try {
+    const blob = dataURLtoBlob(dataUrl);
+    const file = new File([blob], 'stamp.png', { type: 'image/png' });
+
+    // Web Share Level 2（ファイル対応）判定
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ text: shareText, files: [file] });
+      return true;
+    }
+  } catch (_) { /* no-op */ }
+
+  // 非対応ブラウザ → テキストのみの共有URLへフォールバック
+  if (fallbackUrl) window.location.href = fallbackUrl;
+  return false;
+}
+
+// 右の丸ボタン「保存」
 const saveBtn =
   document.getElementById('ftSave') ||
   [...document.querySelectorAll('.floating-tools .icon-btn')].find(b =>
@@ -1668,85 +1695,49 @@ const saveBtn =
   );
 
 saveBtn?.addEventListener('click', () => {
-  const dataUrl = renderPNGDataURL();
-  const img = document.getElementById('savedImagePreview');
+  const url   = renderPNGDataURL();             // 生成した画像 dataURL
+  const img   = document.getElementById('savedImagePreview');
   const modal = document.getElementById('saveModal');
-  img.src = dataUrl;
-
-  // 共有ボタン参照
-  const xBtn  = document.getElementById('modalShareX');
-  const liBtn = document.getElementById('modalShareLINE');
-  const igBtn = document.getElementById('modalShareInsta');
-
-  // dataURL → Blob/File（Web Share API 用）
-  const dataURLtoBlob = (url) => {
-    const [head, body] = url.split(',');
-    const mime = head.match(/data:(.*?);base64/)[1];
-    const bin = atob(body);
-    const len = bin.length;
-    const u8  = new Uint8Array(len);
-    for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
-    return new Blob([u8], { type: mime });
-  };
-
-  // 共有処理（X/LINE/その他共通）
-  const shareWithImage = async (text) => {
-    try {
-      const blob = dataURLtoBlob(dataUrl);
-      const file = new File([blob], 'stamp.png', { type: 'image/png' });
-
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ text, files: [file] });
-      } else {
-        // 画像は諦めてテキストのみのIntentへフォールバック（X）
-        window.open(
-          'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text),
-          '_blank',
-          'noopener'
-        );
-      }
-    } catch (_) {
-      // 失敗時もフォールバック
-      window.open(
-        'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text),
-        '_blank',
-        'noopener'
-      );
-    }
-  };
+  img.src = url;
 
   const shareText = '作ったスタンプをシェア！';
 
-  // Xボタン：クリック時にWeb Share → フォールバック
-  if (xBtn) {
-    // JSが走らなくても安全なように、hrefはテキストのみ（dataURLは入れない）
-    xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareText);
-    xBtn.onclick = (e) => { e.preventDefault(); shareWithImage(shareText); };
-  }
+  // 各ボタン（Aタグ）
+  const x  = document.getElementById('modalShareX');
+  const li = document.getElementById('modalShareLINE');
+  const ig = document.getElementById('modalShareInsta');
 
-  // LINEも同様にWeb Shareを優先（未対応時はテキストのみを開く）
-  if (liBtn) {
-    liBtn.href = 'https://line.me/R/msg/text/?' + encodeURIComponent(shareText);
-    liBtn.onclick = (e) => { e.preventDefault(); shareWithImage(shareText); };
-  }
+  // フォールバック（テキストのみ投稿）
+  const fallbackX  = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+  const fallbackLI = `https://line.me/R/msg/text/?${encodeURIComponent(shareText)}`;
 
-  // InstagramはWebからの投稿URLがないため、Web Shareに委ねるのみ
-  if (igBtn) {
-    igBtn.href = 'https://www.instagram.com/'; // 保険
-    igBtn.onclick = (e) => { e.preventDefault(); shareWithImage(shareText); };
+  // それぞれ「画像共有 → 失敗ならテキストだけ」にする
+  if (x) {
+    x.href = fallbackX;                 // 非対応時の保険
+    x.onclick = (e) => {                // クリック毎に最新画像で共有
+      e.preventDefault();
+      shareImageFile(shareText, url, fallbackX);
+    };
+  }
+  if (li) {
+    li.href = fallbackLI;
+    li.onclick = (e) => {
+      e.preventDefault();
+      shareImageFile(shareText, url, fallbackLI);
+    };
+  }
+  if (ig) {
+    // Instagramは公式Web共有が無いので、OSの共有シート経由に統一
+    ig.href = '#';
+    ig.onclick = (e) => {
+      e.preventDefault();
+      // 共有シートからInstagramを選べる環境では画像で渡せる
+      shareImageFile(shareText, url, null);
+    };
   }
 
   modal?.classList.remove('hidden');
 });
-
-document.getElementById('closeModal')?.addEventListener('click', () => {
-  document.getElementById('saveModal')?.classList.add('hidden');
-});
-document.getElementById('savedImagePreview')?.addEventListener('click', (e) => {
-  const src = e.currentTarget.src;
-  window.open(src, '_blank', 'noopener');
-});
-// ――――――――――――――――――――――――――――――――――― ここまで差し替え
 
 // export 用爆発パス（tctx版）
 function burstPathExport(tctx, w, h, spikes = 12, innerRatio = 0.42) {
