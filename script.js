@@ -315,97 +315,106 @@ function drawBubble(el) {
 
   // しっぽ座標（画面座標で先に計算）
   let tail = null;
-  // 爆発/思考はしっぽ無し
-  if (el.tail && el.tail.enabled && el.shape !== 'thought' && el.shape !== 'burst') {
+// 爆発はしっぽを持たない
+if (el.tail && el.tail.enabled && el.shape !== 'thought' && el.shape !== 'burst') {
     const angle = el.tail.angle;
     const edgeBase = edgePointForShape(el, angle);
     const ca = Math.cos(angle), sa = Math.sin(angle);
     const tip = { x: edgeBase.x + el.tail.length * ca, y: edgeBase.y + el.tail.length * sa };
+    // --- しっぽ座標（毎回「外周との交点」を基点に再計算：常に接着）---
+const nx = -sa, ny = ca;
+const halfW = el.tail.width / 2;
+const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
+const leftW  = halfW * (1 + k);
+const rightW = halfW * (1 - k);
+const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
+const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-    // しっぽ三角の左右端
-    const nx = -sa, ny = ca;
-    const halfW = el.tail.width / 2;
-    const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
-    const leftW  = halfW * (1 + k);
-    const rightW = halfW * (1 - k);
-    const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
-    const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
+// --- 白スジ防止：線幅に応じてしっかり食い込ませる ---
+const EPS_INNER = Math.max(1, el.strokeW * 1.50);
+const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
+const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
-    // 本体に“食い込む”ための内向きオフセット（白スジ防止）
-    const EPS_INNER = Math.max(1, el.strokeW * 1.30);
-    const ix = -ca, iy = -sa; // 中心方向 = 角度の逆向き
-    const bL_in = { x: bL.x + ix*EPS_INNER, y: bL.y + iy*EPS_INNER };
-    const bR_in = { x: bR.x + ix*EPS_INNER, y: bR.y + iy*EPS_INNER };
+// 交点をあとで使うため base を持たせる
+tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
 
-    tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
   }
 
-  // === 塗り: 本体 ===
+  // === 塗り: 本体 + しっぽを1つのパスとして fill ===
   ctx.save();
   ctx.fillStyle = el.fill;
   ctx.translate(el.x, el.y);
+
   ctx.beginPath();
-  if (el.shape === 'rect') {
-    roundedRectPath(-w/2, -h/2, w, h, 18);
-  } else if (el.shape === 'cloud') {
-    cloudPath(w, h);
-  } else if (el.shape === 'thought') {
-    thoughtPath(w, h);
-  } else if (el.shape === 'burst') {
-    burstPath(w, h);
-  } else {
-    roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
-  }
-  ctx.closePath();
-  ctx.fill();
+if (el.shape === 'rect') {
+  roundedRectPath(-w/2, -h/2, w, h, 18);
+} else if (el.shape === 'cloud') {
+  cloudPath(w, h);
+} else if (el.shape === 'thought') {
+  thoughtPath(w, h);
+} else if (el.shape === 'burst') {
+  burstPath(w, h);            // ← 爆発は爆発形のみを描く
+} else {
+  roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
+}
+ctx.closePath();
+ctx.fill();
   ctx.restore();
 
-  // === 線: 本体外周 ===
+    // === 線: 本体外周を stroke → しっぽの2辺だけ stroke（基部は描かない） ===
   ctx.save();
-  ctx.translate(el.x, el.y);
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.miterLimit = 3;
-  ctx.strokeStyle = el.stroke;
-  ctx.lineWidth = el.strokeW;
+ctx.translate(el.x, el.y);
 
+ctx.lineJoin   = 'round'; // ← 角のトゲ/段差を防ぐ
+ctx.lineCap    = 'round';
+ctx.miterLimit = 3;
+
+ctx.strokeStyle = el.stroke;
+ctx.lineWidth   = el.strokeW;
+
+
+
+  // 本体の外周
   ctx.beginPath();
-  if (el.shape === 'rect') {
-    roundedRectPath(-w/2, -h/2, w, h, 18);
-  } else if (el.shape === 'cloud') {
-    cloudPath(w, h);
-  } else if (el.shape === 'thought') {
-    thoughtPath(w, h);
-  } else if (el.shape === 'burst') {
-    burstPath(w, h);
-  } else {
-    roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
-  }
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
+if (el.shape === 'rect') {
+  roundedRectPath(-w/2, -h/2, w, h, 18);
+} else if (el.shape === 'cloud') {
+  cloudPath(w, h);
+} else if (el.shape === 'thought') {
+  thoughtPath(w, h);
+} else if (el.shape === 'burst') {
+  burstPath(w, h);            // ← 爆発の外枠線
+} else {
+  roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
+}
+ctx.closePath();
+ctx.stroke();
+ctx.restore();
 
-  // === しっぽ：本体に食い込ませて接着 → 外側2辺だけ stroke ===
+  // しっぽの塗りを本体へ少し食い込ませて“接着”させる → その後、外側だけ線を引く
   if (tail) {
-    const EXT = Math.max(0.6, el.strokeW * 0.12);
+    const EXT = Math.max(0.6, el.strokeW * 0.12); // ← 線幅が太いほど少し多めに外へ
     const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
     const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
-    // ① 小三角を未クリップで塗る（内側点で食い込ませる）
+    // ① 未クリップで小三角形を塗る（bL_in / bR_in を使って本体側に1px程度潜り込む）
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(tail.bL_in.x, tail.bL_in.y);
+    ctx.moveTo((tail.bL_in?.x ?? tail.bL.x), (tail.bL_in?.y ?? tail.bL.y));
     ctx.lineTo(tipOut.x, tipOut.y);
-    ctx.lineTo(tail.bR_in.x, tail.bR_in.y);
+    ctx.lineTo((tail.bR_in?.x ?? tail.bR.x), (tail.bR_in?.y ?? tail.bR.y));
     ctx.closePath();
     ctx.fillStyle = el.fill;
     ctx.fill();
     ctx.restore();
 
-    // ② 外側だけ clip して2辺だけ stroke（基部は描かない）
+    // ② 外側だけを clip して、2辺だけを stroke（ベース側は描かない）
     ctx.save();
+
+    // --- 外側クリップ（大きな矩形 − 本体形状）---
     ctx.beginPath();
     ctx.rect(0, 0, canvas.width, canvas.height);
+
     ctx.save();
     ctx.translate(el.x, el.y);
     if (el.shape === 'rect') {
@@ -419,29 +428,34 @@ function drawBubble(el) {
     }
     ctx.closePath();
     ctx.restore();
+
     ctx.clip('evenodd');
 
+    // 線（2辺のみ）
     ctx.beginPath();
     ctx.moveTo(tail.bL.x, tail.bL.y);
     ctx.lineTo(tipOut.x,  tipOut.y);
     ctx.lineTo(tail.bR.x, tail.bR.y);
-    ctx.strokeStyle = el.stroke;
-    ctx.lineWidth   = el.strokeW;
-    ctx.lineJoin    = 'round';
-    ctx.lineCap     = 'round';
-    ctx.miterLimit  = 3;
-    ctx.stroke();
-    ctx.restore();
 
-    // ③ 接合点パッチ（画面描画）：本体色で隙間を確実に埋める
-    ctx.save();
-    ctx.fillStyle = el.fill;
-    ctx.beginPath();
-    ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60), 0, Math.PI*2);
-    ctx.fill();
+    ctx.strokeStyle = el.stroke;
+ctx.lineWidth   = el.strokeW;
+ctx.lineJoin    = 'round'; // ← 接合部をなめらかに
+ctx.lineCap     = 'round';
+ctx.miterLimit  = 3;
+ctx.stroke();
+
     ctx.restore();
+    // 交点パッチ
+ctx.save();
+ctx.fillStyle = el.fill;
+ctx.beginPath();
+ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60), 0, Math.PI*2);
+ctx.fill();
+ctx.restore();
+
   }
-}
+
+} // ← ここで drawBubble が必ず閉じる
 
 // 楕円外周
 function ellipseEdgePoint(cx, cy, rx, ry, angle) {
