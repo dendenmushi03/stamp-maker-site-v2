@@ -330,8 +330,8 @@ const rightW = halfW * (1 - k);
 const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
 const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-// --- 塗り：白スジ防止（角丸は少し多めに食い込ませる） ---
-const EPS_INNER = (el.shape === 'rect') ? 1.2 : 0.5;
+// --- 塗り：白スジ防止（線幅に応じて十分食い込ませる） ---
+const EPS_INNER = Math.max(1, el.strokeW * 0.6); // ← 線幅の60%分 内側へ
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
@@ -362,9 +362,11 @@ ctx.fill();
     // === 線: 本体外周を stroke → しっぽの2辺だけ stroke（基部は描かない） ===
   ctx.save();
 ctx.translate(el.x, el.y);
-ctx.lineJoin   = 'miter';
+
+ctx.lineJoin   = 'round'; // ← 角のトゲ/段差を防ぐ
 ctx.lineCap    = 'round';
 ctx.miterLimit = 3;
+
 ctx.strokeStyle = el.stroke;
 ctx.lineWidth   = el.strokeW;
 
@@ -389,7 +391,7 @@ ctx.restore();
 
   // しっぽの塗りを本体へ少し食い込ませて“接着”させる → その後、外側だけ線を引く
   if (tail) {
-    const EXT = 0.6;
+    const EXT = Math.max(0.6, el.strokeW * 0.12); // ← 線幅が太いほど少し多めに外へ
     const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
     const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
@@ -432,12 +434,13 @@ ctx.restore();
     ctx.moveTo(tail.bL.x, tail.bL.y);
     ctx.lineTo(tipOut.x,  tipOut.y);
     ctx.lineTo(tail.bR.x, tail.bR.y);
+
     ctx.strokeStyle = el.stroke;
-    ctx.lineWidth   = el.strokeW;
-    ctx.lineJoin    = 'miter';
-    ctx.lineCap     = 'round';
-    ctx.miterLimit  = 3;
-    ctx.stroke();
+ctx.lineWidth   = el.strokeW;
+ctx.lineJoin    = 'round'; // ← 接合部をなめらかに
+ctx.lineCap     = 'round';
+ctx.miterLimit  = 3;
+ctx.stroke();
 
     ctx.restore();
   }
@@ -1262,7 +1265,7 @@ function renderPNGDataURL() {
         const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
         const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
         tail = { bL, bR, tip };
-        const EPS_INNER = (el.shape === 'rect') ? 1.2 * s : 0.5 * s;
+        const EPS_INNER = Math.max(1, el.strokeW * 0.6) * s;
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
@@ -1332,7 +1335,7 @@ tail = { bL, bR, tip, bL_in, bR_in };
       // しっぽ（基部は描かず、外側2辺のみ表示）
 // 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
 if (tail) {
-  const EXT = 0.6 * s;
+  const EXT = Math.max(0.6, el.strokeW * 0.12) * s;
   const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
   const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
@@ -1466,7 +1469,7 @@ if (tail) {
       const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
       const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
       tail = { bL, bR, tip };
-      const EPS_INNER = (el.shape === 'rect') ? 1.2 * s : 0.5 * s;
+      const EPS_INNER = Math.max(1, el.strokeW * 0.6) * s;
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
@@ -1524,7 +1527,7 @@ tail = { bL, bR, tip, bL_in, bR_in };
     tctx.translate(el.x * s, el.y * s);
     tctx.strokeStyle = el.stroke;
     tctx.lineWidth = el.strokeW * s;
-    tctx.lineJoin = 'miter';
+    tctx.lineJoin = 'round';
     tctx.lineCap = 'round';
     tctx.miterLimit = 3;
 
@@ -1568,7 +1571,7 @@ tail = { bL, bR, tip, bL_in, bR_in };
 // しっぽ（基部は描かず、外側2辺のみ表示）
 // 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
 if (tail) {
-  const EXT = 0.6 * s;
+  const EXT = Math.max(0.6, el.strokeW * 0.12) * s;
   const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
   const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
