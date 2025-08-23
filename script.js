@@ -331,7 +331,7 @@ const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
 const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
 // --- 白スジ防止：線幅に応じてしっかり食い込ませる ---
-const EPS_INNER = Math.max(1, el.strokeW * 1.05);
+const EPS_INNER = Math.max(1, el.strokeW * 1.30);
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
@@ -447,9 +447,9 @@ ctx.stroke();
     ctx.restore();
     // 交点パッチ
 ctx.save();
-ctx.fillStyle = el.stroke;
+ctx.fillStyle = el.fill;
 ctx.beginPath();
-ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.55), 0, Math.PI*2);
+ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60), 0, Math.PI*2);
 ctx.fill();
 ctx.restore();
 
@@ -1392,9 +1392,9 @@ if (tail) {
   tctx.stroke();
   tctx.restore();
      tctx.save();
-    tctx.fillStyle = el.stroke;
+     tctx.fillStyle = el.fill;
     tctx.beginPath();
-    tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.55) * s, 0, Math.PI * 2);
+    tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60) * s, 0, Math.PI * 2);
     tctx.fill();
     tctx.restore();
 }
@@ -1635,9 +1635,9 @@ if (tail) {
   tctx.restore();
 
   tctx.save();
-  tctx.fillStyle = el.stroke;
+  tctx.fillStyle = el.fill;
   tctx.beginPath();
-  tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.55) * s, 0, Math.PI*2);
+  tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60) * s, 0, Math.PI*2);
   tctx.fill();
   tctx.restore();
 
