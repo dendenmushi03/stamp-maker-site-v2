@@ -1687,7 +1687,8 @@ async function shareImageFile(shareText, dataUrl, fallbackUrl) {
   return false;
 }
 
-// 右の丸ボタン「保存」
+
+// 右の丸ボタン「保存」―――――――――――――――――――― ここから差し替え
 const saveBtn =
   document.getElementById('ftSave') ||
   [...document.querySelectorAll('.floating-tools .icon-btn')].find(b =>
@@ -1698,9 +1699,11 @@ saveBtn?.addEventListener('click', () => {
   const url   = renderPNGDataURL();             // 生成した画像 dataURL
   const img   = document.getElementById('savedImagePreview');
   const modal = document.getElementById('saveModal');
-  img.src = url;
+  if (img) img.src = url;
 
-  const shareText = '作ったスタンプをシェア！';
+  // ← ここを追加：本文にサイトURLを入れる
+  const shareUrl  = (window.SHARE_URL || location.origin);
+  const shareText = `作ったスタンプをシェア！\n${shareUrl}`;
 
   // 各ボタン（Aタグ）
   const x  = document.getElementById('modalShareX');
@@ -1711,33 +1714,33 @@ saveBtn?.addEventListener('click', () => {
   const fallbackX  = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
   const fallbackLI = `https://line.me/R/msg/text/?${encodeURIComponent(shareText)}`;
 
-  // それぞれ「画像共有 → 失敗ならテキストだけ」にする
+  // 画像付き共有 → 失敗時はテキストのみ
   if (x) {
-    x.href = fallbackX;                 // 非対応時の保険
-    x.onclick = (e) => {                // クリック毎に最新画像で共有
-      e.preventDefault();
-      shareImageFile(shareText, url, fallbackX);
-    };
+    x.href = fallbackX;
+    x.onclick = (e) => { e.preventDefault(); shareImageFile(shareText, url, fallbackX); };
   }
   if (li) {
     li.href = fallbackLI;
-    li.onclick = (e) => {
-      e.preventDefault();
-      shareImageFile(shareText, url, fallbackLI);
-    };
+    li.onclick = (e) => { e.preventDefault(); shareImageFile(shareText, url, fallbackLI); };
   }
   if (ig) {
-    // Instagramは公式Web共有が無いので、OSの共有シート経由に統一
     ig.href = '#';
-    ig.onclick = (e) => {
-      e.preventDefault();
-      // 共有シートからInstagramを選べる環境では画像で渡せる
-      shareImageFile(shareText, url, null);
-    };
+    ig.onclick = (e) => { e.preventDefault(); shareImageFile(shareText, url, null); };
   }
 
   modal?.classList.remove('hidden');
 });
+
+document.getElementById('closeModal')?.addEventListener('click', () => {
+  document.getElementById('saveModal')?.classList.add('hidden');
+});
+
+document.getElementById('savedImagePreview')?.addEventListener('click', (e) => {
+  const src = e.currentTarget.src;
+  window.open(src, '_blank', 'noopener');
+});
+// ――――――――――――――――――――――――――――――――――― ここまで差し替え
+
 
 // export 用爆発パス（tctx版）
 function burstPathExport(tctx, w, h, spikes = 12, innerRatio = 0.42) {
