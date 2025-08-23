@@ -15,20 +15,24 @@ const DEFAULTS = {
   TAIL_W: 30,   // しっぽの幅（px）
 };
 
-// --- モバイル最適化：ヒットエリアを広げる -----------------------
 const IS_MOBILE = window.matchMedia('(max-width: 480px)').matches;
-let HANDLE_SIZE = IS_MOBILE ? 16 : 10;  // 選択枠ハンドル描画サイズ
-let HANDLE_HIT  = IS_MOBILE ? 22 : 14;  // ハンドルの当たり判定
-let TAIL_HIT_R  = IS_MOBILE ? 26 : 18;  // しっぽ先端ヒット
-let TAIL_BASE_HIT_R = IS_MOBILE ? 22 : 14; // しっぽ基点ヒット
+// 見た目は小さく、ヒットはそのまま
+let HANDLE_SIZE = IS_MOBILE ? 12 : 8;    // ⬛︎の実寸（従来 16/10）
+let HANDLE_HIT  = IS_MOBILE ? 22 : 14;   // 当たり判定
+let TAIL_HIT_R  = IS_MOBILE ? 26 : 18;
+let TAIL_BASE_HIT_R = IS_MOBILE ? 22 : 14;
+// 新規：オレンジ○の見た目半径
+let TAIL_TIP_DRAW_R  = IS_MOBILE ? 5.5 : 4.5; // 先端○
+let TAIL_BASE_DRAW_R = IS_MOBILE ? 5.0 : 4.0; // 基点○（輪）
 
-// 画面回転などでサイズが変わったときの再計算
 window.addEventListener('resize', () => {
   const m = matchMedia('(max-width: 480px)').matches;
-  HANDLE_SIZE = m ? 16 : 10;
+  HANDLE_SIZE = m ? 12 : 8;
   HANDLE_HIT  = m ? 22 : 14;
   TAIL_HIT_R  = m ? 26 : 18;
   TAIL_BASE_HIT_R = m ? 22 : 14;
+  TAIL_TIP_DRAW_R  = m ? 5.5 : 4.5;
+  TAIL_BASE_DRAW_R = m ? 5.0 : 4.0;
 }, { passive: true });
 
 // 論理サイズは 300x300 固定（見た目はCSSで拡大）
@@ -662,23 +666,24 @@ if (el.type === 'text') {
     const tip = { x: edgeBase.x + el.tail.length * Math.cos(el.tail.angle),
                   y: edgeBase.y + el.tail.length * Math.sin(el.tail.angle) };
 
-    // 基点（外周上）…オレンジの輪
-    ctx.beginPath();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#ff8a00';
-    ctx.fillStyle = 'rgba(255,138,0,0.12)';
-    ctx.arc(edgeBase.x, edgeBase.y, 6.5, 0, Math.PI*2);
-    ctx.fill();
-    ctx.stroke();
+  // 基点（外周上）…オレンジの輪（見た目だけ小さく）
+ctx.beginPath();
+ctx.lineWidth = 2;
+ctx.strokeStyle = '#ff8a00';
+ctx.fillStyle = 'rgba(255,138,0,0.12)';
+ctx.arc(edgeBase.x, edgeBase.y, TAIL_BASE_DRAW_R, 0, Math.PI*2);
+ctx.fill();
+ctx.stroke();
 
-    // 先端（従来どおりのオレンジ点）
-    ctx.beginPath();
-    ctx.fillStyle = '#ff8a00';
-    ctx.strokeStyle = '#ff8a00';
-    ctx.lineWidth = 2;
-    ctx.arc(tip.x, tip.y, 7, 0, Math.PI*2);
-    ctx.fill();
-    ctx.stroke();
+// 先端（オレンジ点）
+ctx.beginPath();
+ctx.fillStyle = '#ff8a00';
+ctx.strokeStyle = '#ff8a00';
+ctx.lineWidth = 2;
+ctx.arc(tip.x, tip.y, TAIL_TIP_DRAW_R, 0, Math.PI*2);
+ctx.fill();
+ctx.stroke();
+
   }
 
   ctx.restore();
