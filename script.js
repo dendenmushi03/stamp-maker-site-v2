@@ -1660,8 +1660,7 @@ if (tail) {
   return tmp.toDataURL('image/png');
 }
 
-// 右の丸ボタン「保存」
-// 保存ボタン（#ftSave が無いHTMLでも動くようにフォールバック）
+// 右の丸ボタン「保存」―――――――――――――――――――― ここから差し替え
 const saveBtn =
   document.getElementById('ftSave') ||
   [...document.querySelectorAll('.floating-tools .icon-btn')].find(b =>
@@ -1669,32 +1668,85 @@ const saveBtn =
   );
 
 saveBtn?.addEventListener('click', () => {
-  const url = renderPNGDataURL();
+  const dataUrl = renderPNGDataURL();
   const img = document.getElementById('savedImagePreview');
   const modal = document.getElementById('saveModal');
-  img.src = url;
+  img.src = dataUrl;
 
-  // SNS共有リンクの設定
-  const imageUrl = img.src;
-  const x = document.getElementById('modalShareX');
-  const li = document.getElementById('modalShareLINE');
-  const ig = document.getElementById('modalShareInsta');
-  if (x)  x.href  = `https://twitter.com/intent/tweet?text=作ったスタンプをシェア！&url=${encodeURIComponent(imageUrl)}`;
-  if (li) li.href = `https://line.me/R/msg/text/?${encodeURIComponent(imageUrl)}`;
-  if (ig) ig.href = `https://www.instagram.com/`;
+  // 共有ボタン参照
+  const xBtn  = document.getElementById('modalShareX');
+  const liBtn = document.getElementById('modalShareLINE');
+  const igBtn = document.getElementById('modalShareInsta');
+
+  // dataURL → Blob/File（Web Share API 用）
+  const dataURLtoBlob = (url) => {
+    const [head, body] = url.split(',');
+    const mime = head.match(/data:(.*?);base64/)[1];
+    const bin = atob(body);
+    const len = bin.length;
+    const u8  = new Uint8Array(len);
+    for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
+    return new Blob([u8], { type: mime });
+  };
+
+  // 共有処理（X/LINE/その他共通）
+  const shareWithImage = async (text) => {
+    try {
+      const blob = dataURLtoBlob(dataUrl);
+      const file = new File([blob], 'stamp.png', { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ text, files: [file] });
+      } else {
+        // 画像は諦めてテキストのみのIntentへフォールバック（X）
+        window.open(
+          'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text),
+          '_blank',
+          'noopener'
+        );
+      }
+    } catch (_) {
+      // 失敗時もフォールバック
+      window.open(
+        'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text),
+        '_blank',
+        'noopener'
+      );
+    }
+  };
+
+  const shareText = '作ったスタンプをシェア！';
+
+  // Xボタン：クリック時にWeb Share → フォールバック
+  if (xBtn) {
+    // JSが走らなくても安全なように、hrefはテキストのみ（dataURLは入れない）
+    xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareText);
+    xBtn.onclick = (e) => { e.preventDefault(); shareWithImage(shareText); };
+  }
+
+  // LINEも同様にWeb Shareを優先（未対応時はテキストのみを開く）
+  if (liBtn) {
+    liBtn.href = 'https://line.me/R/msg/text/?' + encodeURIComponent(shareText);
+    liBtn.onclick = (e) => { e.preventDefault(); shareWithImage(shareText); };
+  }
+
+  // InstagramはWebからの投稿URLがないため、Web Shareに委ねるのみ
+  if (igBtn) {
+    igBtn.href = 'https://www.instagram.com/'; // 保険
+    igBtn.onclick = (e) => { e.preventDefault(); shareWithImage(shareText); };
+  }
 
   modal?.classList.remove('hidden');
 });
 
-// モーダルの操作
 document.getElementById('closeModal')?.addEventListener('click', () => {
   document.getElementById('saveModal')?.classList.add('hidden');
 });
 document.getElementById('savedImagePreview')?.addEventListener('click', (e) => {
-  // 画像タップで別タブ表示（長押し保存もしやすい）
   const src = e.currentTarget.src;
   window.open(src, '_blank', 'noopener');
 });
+// ――――――――――――――――――――――――――――――――――― ここまで差し替え
 
 // export 用爆発パス（tctx版）
 function burstPathExport(tctx, w, h, spikes = 12, innerRatio = 0.42) {
