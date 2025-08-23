@@ -315,106 +315,97 @@ function drawBubble(el) {
 
   // しっぽ座標（画面座標で先に計算）
   let tail = null;
-// 爆発はしっぽを持たない
-if (el.tail && el.tail.enabled && el.shape !== 'thought' && el.shape !== 'burst') {
+  // 爆発/思考はしっぽ無し
+  if (el.tail && el.tail.enabled && el.shape !== 'thought' && el.shape !== 'burst') {
     const angle = el.tail.angle;
     const edgeBase = edgePointForShape(el, angle);
     const ca = Math.cos(angle), sa = Math.sin(angle);
     const tip = { x: edgeBase.x + el.tail.length * ca, y: edgeBase.y + el.tail.length * sa };
-    // --- しっぽ座標（毎回「外周との交点」を基点に再計算：常に接着）---
-const nx = -sa, ny = ca;
-const halfW = el.tail.width / 2;
-const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
-const leftW  = halfW * (1 + k);
-const rightW = halfW * (1 - k);
-const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
-const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-// --- 白スジ防止：線幅に応じてしっかり食い込ませる ---
-const EPS_INNER = Math.max(1, el.strokeW * 1.50);
-const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
-const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
+    // しっぽ三角の左右端
+    const nx = -sa, ny = ca;
+    const halfW = el.tail.width / 2;
+    const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
+    const leftW  = halfW * (1 + k);
+    const rightW = halfW * (1 - k);
+    const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
+    const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
-// 交点をあとで使うため base を持たせる
-tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
+    // 本体に“食い込む”ための内向きオフセット（白スジ防止）
+    const EPS_INNER = Math.max(1, el.strokeW * 1.30);
+    const ix = -ca, iy = -sa; // 中心方向 = 角度の逆向き
+    const bL_in = { x: bL.x + ix*EPS_INNER, y: bL.y + iy*EPS_INNER };
+    const bR_in = { x: bR.x + ix*EPS_INNER, y: bR.y + iy*EPS_INNER };
 
+    tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
   }
 
-  // === 塗り: 本体 + しっぽを1つのパスとして fill ===
+  // === 塗り: 本体 ===
   ctx.save();
   ctx.fillStyle = el.fill;
   ctx.translate(el.x, el.y);
-
   ctx.beginPath();
-if (el.shape === 'rect') {
-  roundedRectPath(-w/2, -h/2, w, h, 18);
-} else if (el.shape === 'cloud') {
-  cloudPath(w, h);
-} else if (el.shape === 'thought') {
-  thoughtPath(w, h);
-} else if (el.shape === 'burst') {
-  burstPath(w, h);            // ← 爆発は爆発形のみを描く
-} else {
-  roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
-}
-ctx.closePath();
-ctx.fill();
+  if (el.shape === 'rect') {
+    roundedRectPath(-w/2, -h/2, w, h, 18);
+  } else if (el.shape === 'cloud') {
+    cloudPath(w, h);
+  } else if (el.shape === 'thought') {
+    thoughtPath(w, h);
+  } else if (el.shape === 'burst') {
+    burstPath(w, h);
+  } else {
+    roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
+  }
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 
-    // === 線: 本体外周を stroke → しっぽの2辺だけ stroke（基部は描かない） ===
+  // === 線: 本体外周 ===
   ctx.save();
-ctx.translate(el.x, el.y);
+  ctx.translate(el.x, el.y);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.miterLimit = 3;
+  ctx.strokeStyle = el.stroke;
+  ctx.lineWidth = el.strokeW;
 
-ctx.lineJoin   = 'round'; // ← 角のトゲ/段差を防ぐ
-ctx.lineCap    = 'round';
-ctx.miterLimit = 3;
-
-ctx.strokeStyle = el.stroke;
-ctx.lineWidth   = el.strokeW;
-
-
-
-  // 本体の外周
   ctx.beginPath();
-if (el.shape === 'rect') {
-  roundedRectPath(-w/2, -h/2, w, h, 18);
-} else if (el.shape === 'cloud') {
-  cloudPath(w, h);
-} else if (el.shape === 'thought') {
-  thoughtPath(w, h);
-} else if (el.shape === 'burst') {
-  burstPath(w, h);            // ← 爆発の外枠線
-} else {
-  roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
-}
-ctx.closePath();
-ctx.stroke();
-ctx.restore();
+  if (el.shape === 'rect') {
+    roundedRectPath(-w/2, -h/2, w, h, 18);
+  } else if (el.shape === 'cloud') {
+    cloudPath(w, h);
+  } else if (el.shape === 'thought') {
+    thoughtPath(w, h);
+  } else if (el.shape === 'burst') {
+    burstPath(w, h);
+  } else {
+    roundedRectPath(-w/2, -h/2, w, h, Math.min(w, h)/2);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
 
-  // しっぽの塗りを本体へ少し食い込ませて“接着”させる → その後、外側だけ線を引く
+  // === しっぽ：本体に食い込ませて接着 → 外側2辺だけ stroke ===
   if (tail) {
-    const EXT = Math.max(0.6, el.strokeW * 0.12); // ← 線幅が太いほど少し多めに外へ
+    const EXT = Math.max(0.6, el.strokeW * 0.12);
     const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
     const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
-    // ① 未クリップで小三角形を塗る（bL_in / bR_in を使って本体側に1px程度潜り込む）
+    // ① 小三角を未クリップで塗る（内側点で食い込ませる）
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo((tail.bL_in?.x ?? tail.bL.x), (tail.bL_in?.y ?? tail.bL.y));
+    ctx.moveTo(tail.bL_in.x, tail.bL_in.y);
     ctx.lineTo(tipOut.x, tipOut.y);
-    ctx.lineTo((tail.bR_in?.x ?? tail.bR.x), (tail.bR_in?.y ?? tail.bR.y));
+    ctx.lineTo(tail.bR_in.x, tail.bR_in.y);
     ctx.closePath();
     ctx.fillStyle = el.fill;
     ctx.fill();
     ctx.restore();
 
-    // ② 外側だけを clip して、2辺だけを stroke（ベース側は描かない）
+    // ② 外側だけ clip して2辺だけ stroke（基部は描かない）
     ctx.save();
-
-    // --- 外側クリップ（大きな矩形 − 本体形状）---
     ctx.beginPath();
     ctx.rect(0, 0, canvas.width, canvas.height);
-
     ctx.save();
     ctx.translate(el.x, el.y);
     if (el.shape === 'rect') {
@@ -428,34 +419,29 @@ ctx.restore();
     }
     ctx.closePath();
     ctx.restore();
-
     ctx.clip('evenodd');
 
-    // 線（2辺のみ）
     ctx.beginPath();
     ctx.moveTo(tail.bL.x, tail.bL.y);
     ctx.lineTo(tipOut.x,  tipOut.y);
     ctx.lineTo(tail.bR.x, tail.bR.y);
-
     ctx.strokeStyle = el.stroke;
-ctx.lineWidth   = el.strokeW;
-ctx.lineJoin    = 'round'; // ← 接合部をなめらかに
-ctx.lineCap     = 'round';
-ctx.miterLimit  = 3;
-ctx.stroke();
-
+    ctx.lineWidth   = el.strokeW;
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.miterLimit  = 3;
+    ctx.stroke();
     ctx.restore();
-    // 交点パッチ
-ctx.save();
-ctx.fillStyle = el.fill;
-ctx.beginPath();
-ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60), 0, Math.PI*2);
-ctx.fill();
-ctx.restore();
 
+    // ③ 接合点パッチ（画面描画）：本体色で隙間を確実に埋める
+    ctx.save();
+    ctx.fillStyle = el.fill;
+    ctx.beginPath();
+    ctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60), 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
   }
-
-} // ← ここで drawBubble が必ず閉じる
+}
 
 // 楕円外周
 function ellipseEdgePoint(cx, cy, rx, ry, angle) {
@@ -1185,39 +1171,30 @@ document.getElementById('resetBtn')?.addEventListener('click', () => {
 const EXPORT_SIZE = 200; // ← 背景画像がない時のフォールバック
 
 function renderPNGDataURL() {
-  // 1) 一番下の「背景画像（image要素）」を探す
   const baseImgEl = state.elements.find(e => e.type === 'image' && !e.hidden && e.img);
   if (baseImgEl && (baseImgEl.img.naturalWidth || baseImgEl.img.width)) {
     const iw = baseImgEl.img.naturalWidth || baseImgEl.img.width;
     const ih = baseImgEl.img.naturalHeight || baseImgEl.img.height;
+    const s = iw / baseImgEl.w;
 
-    // キャンバス座標 → 書き出しピクセルの拡大率
-    const s = iw / baseImgEl.w; // (= ih / baseImgEl.h と同じ)
-
-    // 出力キャンバスは「背景画像そのものの大きさ」
-    const outW = Math.round(baseImgEl.w * s); // = iw
-    const outH = Math.round(baseImgEl.h * s); // = ih
+    const outW = Math.round(baseImgEl.w * s);
+    const outH = Math.round(baseImgEl.h * s);
 
     const tmp = document.createElement('canvas');
     tmp.width = outW;
     tmp.height = outH;
     const tctx = tmp.getContext('2d');
 
-    // 背景（白/透過）— ここでは“トリミングされた範囲”だけ塗る
     if (!bgTransparent) {
       tctx.fillStyle = '#ffffff';
       tctx.fillRect(0, 0, outW, outH);
     }
 
-    // 2) 画面上の「背景画像の左上」が (0,0) に来るよう全体をオフセット
-    //    以降は「いつものエクスポート描画」を実行するだけで、
-    //    背景画像の範囲でぴったり切り出されます。
     const cropLeft  = (baseImgEl.x - baseImgEl.w / 2) * s;
     const cropTop   = (baseImgEl.y - baseImgEl.h / 2) * s;
     tctx.translate(-cropLeft, -cropTop);
 
-    // ====== ここからは従来の描画処理（s を使う） ======
-    // 画像レイヤー
+    // 画像
     for (const el of state.elements) {
       if (el.type === 'image' && !el.hidden) {
         tctx.drawImage(
@@ -1230,19 +1207,18 @@ function renderPNGDataURL() {
       }
     }
 
-    // 吹き出しレイヤー（元の export と同じロジックで s を使う）
+    // 吹き出し
     for (const el of state.elements) {
       if (el.type !== 'bubble' || el.hidden) continue;
 
       const w = el.w * s, h = el.h * s;
 
-      // しっぽ計算（爆発/思考の扱いは元のまま）
+      // しっぽ計算（思考は無し）
       let tail = null;
       if (el.tail && el.tail.enabled && el.shape !== 'thought') {
         const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
         let edgeBase;
         if (el.shape === 'rect') {
-          // 角丸長方形の外周交点（元コード準拠）
           const r = 18 * s;
           let t0 = 0, t1 = Math.max(el.w, el.h) * s;
           const sdfRR = (px, py, W, H, R) => {
@@ -1260,27 +1236,27 @@ function renderPNGDataURL() {
           edgeBase = { x: el.x * s + t * ca, y: el.y * s + t * sa };
         } else {
           const rx = (el.w / 2) * s, ry = (el.h / 2) * s;
-          const t = 1 / Math.sqrt((ca * ca) / (rx * rx) + (sa * sa) / (ry * ry));
+          const t = 1 / Math.sqrt((ca*ca)/(rx*rx) + (sa*sa)/(ry*ry));
           edgeBase = { x: el.x * s + t * ca, y: el.y * s + t * sa };
         }
-        const tip = {
-          x: edgeBase.x + (el.tail.length * s) * ca,
-          y: edgeBase.y + (el.tail.length * s) * sa
-        };
+        const tip = { x: edgeBase.x + (el.tail.length * s) * ca,
+                      y: edgeBase.y + (el.tail.length * s) * sa };
+
         const nx = -sa, ny = ca;
         const halfW = (el.tail.width * s) / 2;
         const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
-        const leftW = halfW * (1 + k);
+        const leftW  = halfW * (1 + k);
         const rightW = halfW * (1 - k);
-        const bL = { x: edgeBase.x + nx * leftW, y: edgeBase.y + ny * leftW };
+        const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
         const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
-        tail = { bL, bR, tip };
-        const EPS_INNER = Math.max(1, el.strokeW * 1.05) * s;
-const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
-const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
-tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
+        // 食い込み（内向き）
+        const EPS_INNER = Math.max(1, el.strokeW * 1.30) * s;
+        const ix = -ca, iy = -sa;
+        const bL_in = { x: bL.x + ix*EPS_INNER, y: bL.y + iy*EPS_INNER };
+        const bR_in = { x: bR.x + ix*EPS_INNER, y: bR.y + iy*EPS_INNER };
 
+        tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
       }
 
       // 本体塗り
@@ -1319,10 +1295,9 @@ tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
       tctx.translate(el.x * s, el.y * s);
       tctx.strokeStyle = el.stroke;
       tctx.lineWidth = el.strokeW * s;
-      tctx.lineJoin = 'round';
-      tctx.lineCap = 'round';
+      tctx.lineJoin = 'miter';
+      tctx.lineCap  = 'round';
       tctx.miterLimit = 3;
-
       tctx.beginPath();
       if (el.shape === 'rect') {
         drawRR(w, h, 18 * s);
@@ -1342,63 +1317,62 @@ tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
       tctx.stroke();
       tctx.restore();
 
-      // しっぽ（基部は描かず、外側2辺のみ表示）
-// 先に未クリップで小三角を塗って“接着”→ その後 外側だけ stroke
-if (tail) {
-  const EXT = Math.max(0.6, el.strokeW * 0.12) * s;
-  const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
-  const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+      // しっぽ（接着 → 外側2辺だけ stroke → 接合点パッチ）
+      if (tail) {
+        const EXT = Math.max(0.6, el.strokeW * 0.12) * s;
+        const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+        const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
 
-  // ① 未クリップで小三角を塗る（内側点を使って本体に食い込ませる）
-  tctx.beginPath();
-  tctx.moveTo(tail.bL_in?.x ?? tail.bL.x, tail.bL_in?.y ?? tail.bL.y);
-  tctx.lineTo(tipOut.x, tipOut.y);
-  tctx.lineTo(tail.bR_in?.x ?? tail.bR.x, tail.bR_in?.y ?? tail.bR.y);
-  tctx.closePath();
-  tctx.fillStyle = el.fill;
-  tctx.fill();
+        // 小三角を塗る
+        tctx.beginPath();
+        tctx.moveTo(tail.bL_in.x, tail.bL_in.y);
+        tctx.lineTo(tipOut.x, tipOut.y);
+        tctx.lineTo(tail.bR_in.x, tail.bR_in.y);
+        tctx.closePath();
+        tctx.fillStyle = el.fill;
+        tctx.fill();
 
-  // ② 外側だけ clip して2辺を stroke
-  const outside = new Path2D();
-  outside.rect(0, 0, tmp.width, tmp.height);
+        // 外側だけ clip して2辺 stroke
+        const outside = new Path2D();
+        outside.rect(0, 0, tmp.width, tmp.height);
 
-  const shape = new Path2D();
-  const ox = el.x * s, oy = el.y * s;
-  const w2 = el.w * s, h2 = el.h * s;
-  const rr2 = Math.min(18 * s, Math.min(w2, h2) / 2);
-  shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
-  shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
-  shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
-  shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
-  shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
-  shape.closePath();
+        const shape = new Path2D();
+        const ox = el.x * s, oy = el.y * s;
+        const w2 = el.w * s, h2 = el.h * s;
+        const rr2 = Math.min(18 * s, Math.min(w2, h2) / 2);
+        shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
+        shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
+        shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
+        shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
+        shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
+        shape.closePath();
 
-  const clipPath = new Path2D();
-  clipPath.addPath(outside);
-  clipPath.addPath(shape);
+        const clipPath = new Path2D();
+        clipPath.addPath(outside);
+        clipPath.addPath(shape);
 
-  tctx.save();
-  tctx.clip(clipPath, 'evenodd');
+        tctx.save();
+        tctx.clip(clipPath, 'evenodd');
+        tctx.beginPath();
+        tctx.moveTo(tail.bL.x, tail.bL.y);
+        tctx.lineTo(tipOut.x,  tipOut.y);
+        tctx.lineTo(tail.bR.x, tail.bR.y);
+        tctx.strokeStyle = el.stroke;
+        tctx.lineWidth   = el.strokeW * s;
+        tctx.lineJoin    = 'round';
+        tctx.lineCap     = 'round';
+        tctx.miterLimit  = 2.5;
+        tctx.stroke();
+        tctx.restore();
 
-  tctx.beginPath();
-  tctx.moveTo(tail.bL.x, tail.bL.y);
-  tctx.lineTo(tipOut.x,  tipOut.y);
-  tctx.lineTo(tail.bR.x, tail.bR.y);
-  tctx.strokeStyle = el.stroke;
-  tctx.lineWidth   = el.strokeW * s;
-  tctx.lineJoin    = 'round';
-  tctx.lineCap     = 'round';
-  tctx.miterLimit  = 2.5;
-  tctx.stroke();
-  tctx.restore();
-     tctx.save();
-     tctx.fillStyle = el.fill;
-    tctx.beginPath();
-    tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60) * s, 0, Math.PI * 2);
-    tctx.fill();
-    tctx.restore();
-}
-
+        // 接合点パッチ（書き出し・トリミングブランチ）
+        tctx.save();
+        tctx.fillStyle = el.fill;
+        tctx.beginPath();
+        tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60) * s, 0, Math.PI * 2);
+        tctx.fill();
+        tctx.restore();
+      }
     }
 
     // テキスト
@@ -1415,6 +1389,232 @@ if (tail) {
 
     return tmp.toDataURL('image/png');
   }
+
+  // ===== 背景無し（200×200 フォールバック） =====
+  const tmp = document.createElement('canvas');
+  tmp.width = 200;
+  tmp.height = 200;
+  const tctx = tmp.getContext('2d');
+  if (!bgTransparent) {
+    tctx.fillStyle = '#ffffff';
+    tctx.fillRect(0, 0, tmp.width, tmp.height);
+  }
+  const s = 200 / canvas.width;
+
+  // 画像
+  for (const el of state.elements) {
+    if (el.type === 'image' && !el.hidden) {
+      tctx.drawImage(
+        el.img,
+        (el.x - el.w / 2) * s,
+        (el.y - el.h / 2) * s,
+        el.w * s,
+        el.h * s
+      );
+    }
+  }
+
+  // 吹き出し
+  for (const el of state.elements) {
+    if (el.type !== 'bubble' || el.hidden) continue;
+
+    const w = el.w * s, h = el.h * s;
+
+    let tail = null;
+    if (el.tail && el.tail.enabled && el.shape !== 'thought') {
+      const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+      let edgeBase;
+      if (el.shape === 'rect') {
+        const r = 18 * s;
+        let t0 = 0, t1 = Math.max(el.w, el.h) * s;
+        const sdfRR = (px, py, W, H, R) => {
+          const qx = Math.abs(px) - (W/2 - R);
+          const qy = Math.abs(py) - (H/2 - R);
+          const qx2 = Math.max(qx, 0), qy2 = Math.max(qy, 0);
+          return Math.hypot(qx2, qy2) + Math.min(Math.max(qx, qy), 0) - R;
+        };
+        for (let i = 0; i < 22; i++) {
+          const tm = (t0 + t1) / 2, px = tm * ca, py = tm * sa;
+          const d = sdfRR(px, py, el.w * s, el.h * s, r);
+          if (d > 0) t1 = tm; else t0 = tm;
+        }
+        const t = (t0 + t1) / 2;
+        edgeBase = { x: el.x * s + t * ca, y: el.y * s + t * sa };
+      } else {
+        const rx = (el.w / 2) * s, ry = (el.h / 2) * s;
+        const t = 1 / Math.sqrt((ca*ca)/(rx*rx) + (sa*sa)/(ry*ry));
+        edgeBase = { x: el.x * s + t * ca, y: el.y * s + t * sa };
+      }
+      const tip = { x: edgeBase.x + (el.tail.length * s) * ca,
+                    y: edgeBase.y + (el.tail.length * s) * sa };
+
+      const nx = -sa, ny = ca;
+      const halfW = (el.tail.width * s) / 2;
+      const k = Math.max(-0.9, Math.min(0.9, el.tail.skew ?? 0));
+      const leftW  = halfW * (1 + k);
+      const rightW = halfW * (1 - k);
+      const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
+      const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
+
+      // 食い込み（内向き）
+      const EPS_INNER = Math.max(1, el.strokeW * 1.30) * s;
+      const ix = -ca, iy = -sa;
+      const bL_in = { x: bL.x + ix*EPS_INNER, y: bL.y + iy*EPS_INNER };
+      const bR_in = { x: bR.x + ix*EPS_INNER, y: bR.y + iy*EPS_INNER };
+
+      tail = { bL, bR, tip, bL_in, bR_in, base: edgeBase };
+    }
+
+    // 本体塗り
+    tctx.save();
+    tctx.fillStyle = el.fill;
+    tctx.translate(el.x * s, el.y * s);
+    tctx.beginPath();
+    const drawRR = (W, H, R) => {
+      const rr = Math.min(R, Math.min(W, H) / 2);
+      tctx.moveTo(-W/2 + rr, -H/2);
+      tctx.arcTo(W/2, -H/2,  W/2,  H/2, rr);
+      tctx.arcTo(W/2,  H/2, -W/2,  H/2, rr);
+      tctx.arcTo(-W/2, H/2, -W/2, -H/2, rr);
+      tctx.arcTo(-W/2, -H/2,  W/2, -H/2, rr);
+      tctx.closePath();
+    };
+    if (el.shape === 'rect') drawRR(w, h, 18 * s);
+    else if (el.shape === 'cloud' || el.shape === 'thought') {
+      const a = Math.min(w, h) / 2;
+      tctx.arc(-w/2 + a*0.8,  -h/2 + a*0.9, a*0.55, 0, Math.PI*2);
+      tctx.arc(-w/2 + a*1.2,  -h/2 + a*0.7, a*0.6,  0, Math.PI*2);
+      tctx.arc(-w/2 + a*1.6,  -h/2 + a*0.9, a*0.5,  0, Math.PI*2);
+      tctx.arc(-w/2 + a*1.2,  -h/2 + a*1.2, a*0.6,  0, Math.PI*2);
+    } else if (el.shape === 'burst') {
+      const spikes = 12, R = Math.min(w, h) * 0.50, r = R * 0.62;
+      const step = (Math.PI * 2) / (spikes * 2);
+      tctx.moveTo(R, 0);
+      for (let i = 1; i < spikes * 2; i++) {
+        const ang = i * step;
+        const rad = (i % 2 === 0) ? R : r;
+        tctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+      }
+      tctx.closePath();
+    } else {
+      drawRR(w, h, Math.min(w, h) / 2);
+    }
+    tctx.fill();
+    tctx.restore();
+
+    // 外枠線
+    tctx.save();
+    tctx.translate(el.x * s, el.y * s);
+    tctx.strokeStyle = el.stroke;
+    tctx.lineWidth = el.strokeW * s;
+    tctx.lineJoin  = 'round';
+    tctx.lineCap   = 'round';
+    tctx.miterLimit= 3;
+    tctx.beginPath();
+    if (el.shape === 'rect') {
+      const rr = Math.min(18 * s, Math.min(w, h)/2);
+      tctx.moveTo(-w/2+rr, -h/2);
+      tctx.arcTo(w/2, -h/2,  w/2,  h/2, rr);
+      tctx.arcTo(w/2,  h/2, -w/2,  h/2, rr);
+      tctx.arcTo(-w/2, h/2, -w/2, -h/2, rr);
+      tctx.arcTo(-w/2, -h/2,  w/2, -h/2, rr);
+      tctx.closePath();
+    } else if (el.shape === 'cloud' || el.shape === 'thought') {
+      const a = Math.min(w, h) / 2;
+      tctx.arc(-w/2 + a*0.8,  -h/2 + a*0.9, a*0.55, 0, Math.PI*2);
+      tctx.arc(-w/2 + a*1.2,  -h/2 + a*0.7, a*0.6,  0, Math.PI*2);
+      tctx.arc(-w/2 + a*1.6,  -h/2 + a*0.9, a*0.5,  0, Math.PI*2);
+      tctx.arc(-w/2 + a*1.2,  -h/2 + a*1.2, a*0.6,  0, Math.PI*2);
+    } else if (el.shape === 'burst') {
+      const spikes = 12, R = Math.min(w, h) * 0.50, r = R * 0.62;
+      const step = (Math.PI * 2) / (spikes * 2);
+      tctx.moveTo(R, 0);
+      for (let i = 1; i < spikes * 2; i++) {
+        const ang = i * step;
+        const rad = (i % 2 === 0) ? R : r;
+        tctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+      }
+      tctx.closePath();
+    } else {
+      const rr = Math.min(w, h)/2;
+      tctx.moveTo(-w/2+rr, -h/2);
+      tctx.arcTo(w/2, -h/2,  w/2,  h/2, rr);
+      tctx.arcTo(w/2,  h/2, -w/2,  h/2, rr);
+      tctx.arcTo(-w/2, h/2, -w/2, -h/2, rr);
+      tctx.arcTo(-w/2, -h/2,  w/2, -h/2, rr);
+      tctx.closePath();
+    }
+    tctx.stroke();
+    tctx.restore();
+
+    if (tail) {
+      const EXT = Math.max(0.6, el.strokeW * 0.12) * s;
+      const ca = Math.cos(el.tail.angle), sa = Math.sin(el.tail.angle);
+      const tipOut = { x: tail.tip.x + ca*EXT, y: tail.tip.y + sa*EXT };
+
+      tctx.beginPath();
+      tctx.moveTo(tail.bL_in.x, tail.bL_in.y);
+      tctx.lineTo(tipOut.x, tipOut.y);
+      tctx.lineTo(tail.bR_in.x, tail.bR_in.y);
+      tctx.closePath();
+      tctx.fillStyle = el.fill;
+      tctx.fill();
+
+      const outside = new Path2D();
+      outside.rect(0, 0, tmp.width, tmp.height);
+      const shape = new Path2D();
+      const ox = el.x * s, oy = el.y * s;
+      const w2 = el.w * s, h2 = el.h * s;
+      const rr2 = Math.min(18 * s, Math.min(w2, h2) / 2);
+      shape.moveTo(ox - w2/2 + rr2, oy - h2/2);
+      shape.arcTo(ox + w2/2, oy - h2/2,  ox + w2/2,  oy + h2/2, rr2);
+      shape.arcTo(ox + w2/2, oy + h2/2,  ox - w2/2,  oy + h2/2, rr2);
+      shape.arcTo(ox - w2/2, oy + h2/2,  ox - w2/2,  oy - h2/2, rr2);
+      shape.arcTo(ox - w2/2, oy - h2/2,  ox + w2/2,  oy - h2/2, rr2);
+      shape.closePath();
+
+      const clipPath = new Path2D();
+      clipPath.addPath(outside);
+      clipPath.addPath(shape);
+
+      tctx.save();
+      tctx.clip(clipPath, 'evenodd');
+      tctx.beginPath();
+      tctx.moveTo(tail.bL.x, tail.bL.y);
+      tctx.lineTo(tipOut.x,  tipOut.y);
+      tctx.lineTo(tail.bR.x, tail.bR.y);
+      tctx.strokeStyle = el.stroke;
+      tctx.lineWidth   = el.strokeW * s;
+      tctx.lineJoin    = 'round';
+      tctx.lineCap     = 'round';
+      tctx.miterLimit  = 2.5;
+      tctx.stroke();
+      tctx.restore();
+
+      // 接合点パッチ（フォールバック）
+      tctx.save();
+      tctx.fillStyle = el.fill;
+      tctx.beginPath();
+      tctx.arc(tail.base.x, tail.base.y, Math.max(0.5, el.strokeW * 0.60) * s, 0, Math.PI*2);
+      tctx.fill();
+      tctx.restore();
+    }
+  }
+
+  // テキスト
+  for (const el of state.elements) {
+    if (el.type !== 'text' || el.hidden) continue;
+    tctx.save();
+    tctx.fillStyle   = el.color;
+    tctx.textAlign   = 'center';
+    tctx.textBaseline= 'middle';
+    tctx.font        = `${el.size * s}px ${el.font}`;
+    wrapTextHD(tctx, el.text, el.x * s, el.y * s, 240 * s, el.size * 1.2 * s);
+    tctx.restore();
+  }
+
+  return tmp.toDataURL('image/png');
+}
 
   // 3) 背景画像が無ければ、従来通りの 300×300 正方形で出力
   const tmp = document.createElement('canvas');
