@@ -331,7 +331,7 @@ const bL = { x: edgeBase.x + nx * leftW,  y: edgeBase.y + ny * leftW  };
 const bR = { x: edgeBase.x - nx * rightW, y: edgeBase.y - ny * rightW };
 
 // --- 白スジ防止：線幅に応じてしっかり食い込ませる ---
-const EPS_INNER = Math.max(1, el.strokeW * 1.30);
+const EPS_INNER = Math.max(1, el.strokeW * 1.50);
 const bL_in = { x: bL.x - nx*EPS_INNER, y: bL.y - ny*EPS_INNER };
 const bR_in = { x: bR.x + nx*EPS_INNER, y: bR.y + ny*EPS_INNER };
 
