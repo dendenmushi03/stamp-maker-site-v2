@@ -1259,142 +1259,60 @@ document.getElementById('resetBtn')?.addEventListener('click', () => {
   if (confirm('初期状態に戻しますか？')) resetAll();
 });
 
-// ====== 保存（背景画像サイズにトリミングして出力） ======
-const EXPORT_SIZE = 200; // ← 背景画像がない時のフォールバック
+// ====== 保存（キャンバス全体を透明PNGで出力） ======
 
 function renderPNGDataURL() {
-  // 1) 一番下の「背景画像（image要素）」を探す
-  const baseImgEl = state.elements.find(e => e.type === 'image' && !e.hidden && e.img);
-  if (baseImgEl && (baseImgEl.img.naturalWidth || baseImgEl.img.width)) {
-    const iw = baseImgEl.img.naturalWidth || baseImgEl.img.width;
-    const ih = baseImgEl.img.naturalHeight || baseImgEl.img.height;
+  const exportSizeInput = document.getElementById('exportSize');
+  const requestedSize = Number(exportSizeInput?.value ?? exportSize ?? CANVAS_SIZE);
+  const outSize = Number.isFinite(requestedSize)
+    ? Math.max(1, Math.round(requestedSize))
+    : CANVAS_SIZE;
 
-    // キャンバス座標 → 書き出しピクセルの拡大率
-    const s = iw / baseImgEl.w; // (= ih / baseImgEl.h と同じ)
-
-    // 出力キャンバスは「背景画像そのものの大きさ」
-    const outW = Math.round(baseImgEl.w * s); // = iw
-    const outH = Math.round(baseImgEl.h * s); // = ih
-
-    const tmp = document.createElement('canvas');
-    tmp.width = outW;
-    tmp.height = outH;
-    const tctx = tmp.getContext('2d');
-    tctx.imageSmoothingEnabled = true;
-    tctx.imageSmoothingQuality = 'high';
-
-    // 背景（白/透過）— ここでは“トリミングされた範囲”だけ塗る
-    if (!bgTransparent) {
-      tctx.fillStyle = '#ffffff';
-      tctx.fillRect(0, 0, outW, outH);
-    }
-
-    // 2) 画面上の「背景画像の左上」が (0,0) に来るよう全体をオフセット
-    //    以降は「いつものエクスポート描画」を実行するだけで、
-    //    背景画像の範囲でぴったり切り出されます。
-    const cropLeft  = (baseImgEl.x - baseImgEl.w / 2) * s;
-    const cropTop   = (baseImgEl.y - baseImgEl.h / 2) * s;
-    tctx.translate(-cropLeft, -cropTop);
-
-    // ====== ここからは従来の描画処理（s を使う） ======
-    // 画像レイヤー
-    for (const el of state.elements) {
-      if (el.type === 'image' && !el.hidden) {
-        tctx.drawImage(
-          el.img,
-          (el.x - el.w / 2) * s,
-          (el.y - el.h / 2) * s,
-          el.w * s,
-          el.h * s
-        );
-      }
-    }
-
-    // 吹き出しレイヤー（元の export と同じロジックで s を使う）
-    for (const el of state.elements) {
-      if (el.type !== 'bubble' || el.hidden) continue;
-      const bubbleForExport = {
-        ...el,
-        x: el.x * s,
-        y: el.y * s,
-        w: el.w * s,
-        h: el.h * s,
-        strokeW: el.strokeW * s,
-        tail: el.tail ? { ...el.tail, length: el.tail.length * s, width: el.tail.width * s } : el.tail,
-      };
-      paintBubble(tctx, bubbleForExport, { canvasSize: Math.max(tmp.width, tmp.height) });
-    }
-
-    // テキスト
-    for (const el of state.elements) {
-      if (el.type !== 'text' || el.hidden) continue;
-      tctx.save();
-      tctx.fillStyle   = el.color;
-      tctx.textAlign   = 'center';
-      tctx.textBaseline= 'middle';
-      tctx.font        = `${el.size * s}px ${el.font}`;
-      wrapTextHD(tctx, el.text, el.x * s, el.y * s, 240 * s, el.size * 1.2 * s);
-      tctx.restore();
-    }
-
-    return tmp.toDataURL('image/png');
-  }
-
-  // 3) 背景画像が無ければ、従来通りの 300×300 正方形で出力
   const tmp = document.createElement('canvas');
-  tmp.width = EXPORT_SIZE;
-  tmp.height = EXPORT_SIZE;
+  tmp.width = outSize;
+  tmp.height = outSize;
+
   const tctx = tmp.getContext('2d');
   tctx.imageSmoothingEnabled = true;
   tctx.imageSmoothingQuality = 'high';
-  if (!bgTransparent) {
-    tctx.fillStyle = '#ffffff';
-    tctx.fillRect(0, 0, tmp.width, tmp.height);
-  }
-  const s = EXPORT_SIZE / CANVAS_SIZE;
 
-  // ===== 画像層 =====
+  // 背景は常に透明のまま（白塗りしない）
+  const scale = outSize / CANVAS_SIZE;
+  tctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+  // 画面上のキャンバス論理座標をそのまま再描画
   for (const el of state.elements) {
-    if (el.type === 'image' && !el.hidden) {
+    if (el.type === 'image' && !el.hidden && el.img) {
       tctx.drawImage(
         el.img,
-        (el.x - el.w / 2) * s,
-        (el.y - el.h / 2) * s,
-        el.w * s,
-        el.h * s
+        el.x - el.w / 2,
+        el.y - el.h / 2,
+        el.w,
+        el.h
       );
     }
   }
 
-  // ===== 吹き出し層 =====
   for (const el of state.elements) {
-    if (el.type !== 'bubble' || el.hidden) continue;
-    const bubbleForExport = {
-      ...el,
-      x: el.x * s,
-      y: el.y * s,
-      w: el.w * s,
-      h: el.h * s,
-      strokeW: el.strokeW * s,
-      tail: el.tail ? { ...el.tail, length: el.tail.length * s, width: el.tail.width * s } : el.tail,
-    };
-    paintBubble(tctx, bubbleForExport, { canvasSize: Math.max(tmp.width, tmp.height) });
+    if (el.type === 'bubble' && !el.hidden) {
+      paintBubble(tctx, el, { canvasSize: CANVAS_SIZE });
+    }
   }
 
-  // ===== テキスト層 =====
   for (const el of state.elements) {
     if (el.type !== 'text' || el.hidden) continue;
     tctx.save();
-    tctx.fillStyle   = el.color;
-    tctx.textAlign   = 'center';
-    tctx.textBaseline= 'middle';
-    tctx.font        = `${el.size * s}px ${el.font}`;
-    wrapTextHD(tctx, el.text, el.x * s, el.y * s, 240 * s, el.size * 1.2 * s);
+    tctx.fillStyle = el.color;
+    tctx.textAlign = 'center';
+    tctx.textBaseline = 'middle';
+    tctx.font = `${el.size}px ${el.font}`;
+    wrapTextHD(tctx, el.text, el.x, el.y, 240, el.size * 1.2);
     tctx.restore();
   }
 
   return tmp.toDataURL('image/png');
 }
+
 
 // ===== Web Share（画像ファイルを共有）ヘルパー =====
 function dataURLtoBlob(dataURL) {
