@@ -288,6 +288,39 @@ const TEXT_PRESETS = {
 };
 let defaultTextPreset = 'standard';
 
+const TEMPLATES = [
+  {
+    id: 'tsukkomi',
+    name: 'ツッコミ',
+    bubble: { shape: 'round', x: 104, y: 88, w: 132, h: 96, strokeW: 7, tail: { angle: Math.PI / 3.2, length: 34, width: 24 } },
+    text: { text: 'それな', x: 104, y: 84, size: 34, preset: 'blackWhite', maxWidth: 118, lineHeight: 1.2 },
+  },
+  {
+    id: 'sakebi',
+    name: '叫び',
+    bubble: { shape: 'burst', x: 102, y: 88, w: 138, h: 106, strokeW: 9, tail: { enabled: false } },
+    text: { text: 'ええ!?', x: 102, y: 86, size: 40, preset: 'strong', maxWidth: 122, lineHeight: 1.08 },
+  },
+  {
+    id: 'hitokoto',
+    name: 'ひとこと',
+    bubble: { shape: 'rect', x: 100, y: 92, w: 130, h: 90, strokeW: 6, tail: { angle: Math.PI / 2.9, length: 26, width: 20 } },
+    text: { text: '了解', x: 100, y: 90, size: 30, preset: 'standard', maxWidth: 110, lineHeight: 1.2 },
+  },
+  {
+    id: 'line',
+    name: 'LINE風',
+    bubble: { shape: 'round', x: 102, y: 92, w: 134, h: 92, strokeW: 5, tail: { angle: Math.PI / 2.7, length: 24, width: 18 } },
+    text: { text: 'おつかれ！', x: 102, y: 90, size: 28, preset: 'standard', maxWidth: 118, lineHeight: 1.25 },
+  },
+  {
+    id: 'stamp',
+    name: 'スタンプ風',
+    bubble: null,
+    text: { text: '最高', x: 100, y: 100, size: 42, preset: 'whiteBlack', maxWidth: 140, lineHeight: 1.12 },
+  },
+];
+
 function applyTextPresetToElement(el, presetName) {
   const preset = TEXT_PRESETS[presetName] || TEXT_PRESETS.standard;
   el.presetName = presetName in TEXT_PRESETS ? presetName : 'standard';
@@ -321,31 +354,60 @@ function normalizeTextElement(el) {
   return el;
 }
 
-function addBubble(shape = 'round') {
-  snapshot();
-
-  // ← 先に取得してからオブジェクトを組み立てる
+function createBubbleElement(config = {}) {
   const swInput = document.getElementById('strokeWidth');
   const twInput = document.getElementById('tailWidth');
-
-  const el = {
+  return {
     id: genId(),
     type: 'bubble',
-    shape, x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2, w: 150, h: 110,
-    hidden: false, locked: false,
-    fill: document.getElementById('fillColor').value,
-    stroke: document.getElementById('strokeColor').value,
-    strokeW: parseInt(swInput?.value ?? DEFAULTS.STROKE_W, 10),
+    shape: config.shape ?? 'round',
+    x: config.x ?? (CANVAS_SIZE / 2),
+    y: config.y ?? (CANVAS_SIZE / 2),
+    w: config.w ?? 150,
+    h: config.h ?? 110,
+    hidden: false,
+    locked: false,
+    fill: config.fill ?? document.getElementById('fillColor').value,
+    stroke: config.stroke ?? document.getElementById('strokeColor').value,
+    strokeW: config.strokeW ?? parseInt(swInput?.value ?? DEFAULTS.STROKE_W, 10),
     tail: {
-      angle: Math.PI / 6,
-      length: 40,
-      width: parseInt(twInput?.value ?? DEFAULTS.TAIL_W, 10),
-      enabled: true,
-      skew: 0
+      angle: config.tail?.angle ?? Math.PI / 6,
+      length: config.tail?.length ?? 40,
+      width: config.tail?.width ?? parseInt(twInput?.value ?? DEFAULTS.TAIL_W, 10),
+      enabled: config.tail?.enabled ?? (config.shape !== 'burst'),
+      skew: config.tail?.skew ?? 0,
     }
   };
+}
 
-  if (shape === 'burst') el.tail.enabled = false; // 爆発は基本しっぽ無し
+function createTextElement(config = {}) {
+  const fsInput = document.getElementById('fontSize');
+  const textEl = normalizeTextElement({
+    id: genId(),
+    type: 'text',
+    x: config.x ?? 150,
+    y: config.y ?? 150,
+    hidden: false,
+    locked: false,
+    text: config.text ?? (document.getElementById('textInput').value || 'テキスト'),
+    color: config.color ?? document.getElementById('textColor').value,
+    size: config.size ?? parseInt(fsInput?.value ?? 32, 10),
+    font: config.font ?? document.getElementById('fontFamily').value,
+    align: 'center',
+    maxWidth: config.maxWidth ?? 160,
+    lineHeight: config.lineHeight ?? 1.2,
+    presetName: config.preset ?? defaultTextPreset,
+  });
+  applyTextPresetToElement(textEl, textEl.presetName);
+  if (config.color) textEl.color = config.color;
+  if (config.lineHeight) textEl.lineHeight = config.lineHeight;
+  if (config.maxWidth) textEl.maxWidth = config.maxWidth;
+  return textEl;
+}
+
+function addBubble(shape = 'round') {
+  snapshot();
+  const el = createBubbleElement({ shape });
   state.elements.push(el);
   state.selectedId = el.id;
   updateUIFromSelection();
@@ -354,23 +416,35 @@ function addBubble(shape = 'round') {
 
 function addText() {
   snapshot();
-  const fsInput = document.getElementById('fontSize'); // ← 無いHTMLでもOKに
-  const textEl = normalizeTextElement({
-    id: genId(),
-    type: 'text',
-    x: 150, y: 150,
-    hidden: false, locked: false,
-    text: document.getElementById('textInput').value || 'テキスト',
-    color: document.getElementById('textColor').value,
-    size: parseInt(fsInput?.value ?? 32, 10),  // ← デフォルト32
-    font: document.getElementById('fontFamily').value,
-    align: 'center',
-    maxWidth: 160,
-    presetName: defaultTextPreset,
-  });
-  applyTextPresetToElement(textEl, textEl.presetName);
+  const textEl = createTextElement({});
   state.elements.push(textEl);
   state.selectedId = state.elements.at(-1)?.id || null;
+  updateUIFromSelection();
+  draw();
+}
+
+function applyTemplate(templateId) {
+  const template = TEMPLATES.find(t => t.id === templateId);
+  if (!template) return;
+
+  snapshot();
+
+  const created = [];
+  if (template.bubble) {
+    const bubbleEl = createBubbleElement(template.bubble);
+    state.elements.push(bubbleEl);
+    created.push(bubbleEl);
+  }
+
+  if (template.text) {
+    const textEl = createTextElement(template.text);
+    state.elements.push(textEl);
+    created.push(textEl);
+  }
+
+  if (!created.length) return;
+
+  state.selectedId = created.at(-1).id;
   updateUIFromSelection();
   draw();
 }
@@ -1362,6 +1436,9 @@ tabButtons.forEach(btn => btn.addEventListener('click', () => {
 
 Array.from(document.querySelectorAll('[data-action="add-bubble"]')).forEach(b => {
   b.addEventListener('click', () => addBubble(b.dataset.shape));
+});
+Array.from(document.querySelectorAll('[data-action="apply-template"]')).forEach(btn => {
+  btn.addEventListener('click', () => applyTemplate(btn.dataset.template));
 });
 document.getElementById('addTextBtn').addEventListener('click', addText);
 

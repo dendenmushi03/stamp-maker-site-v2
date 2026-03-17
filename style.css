@@ -218,6 +218,19 @@ body {
 .panel.is-active { display: grid; }
 .panel-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
+.template-section { display: grid; gap: 8px; }
+.template-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.template-chip {
+  white-space: nowrap;
+  min-height: 40px;
+}
+
 /* コントロール群 */
 .btn {
   height: 44px; padding: 0 14px;

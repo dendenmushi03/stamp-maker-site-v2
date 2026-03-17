@@ -56,6 +56,17 @@
     <!-- 各種パネル（初期は「吹き出し」を表示） -->
     <section class="panel is-active" data-panel="bubble">
       <div class="panel-row">
+        <div class="template-section" style="width:100%">
+          <div class="hint">テンプレート（ワンタップで土台を追加）</div>
+          <div class="template-row" role="group" aria-label="テンプレート">
+            <button class="chip template-chip" data-action="apply-template" data-template="tsukkomi">ツッコミ</button>
+            <button class="chip template-chip" data-action="apply-template" data-template="sakebi">叫び</button>
+            <button class="chip template-chip" data-action="apply-template" data-template="hitokoto">ひとこと</button>
+            <button class="chip template-chip" data-action="apply-template" data-template="line">LINE風</button>
+            <button class="chip template-chip" data-action="apply-template" data-template="stamp">スタンプ風</button>
+          </div>
+        </div>
+
         <button class="chip" data-action="add-bubble" data-shape="round">丸</button>
 <!--         <button class="chip" data-action="add-bubble" data-shape="rect">角丸</button>
         <button class="chip" data-action="add-bubble" data-shape="cloud">雲</button>
