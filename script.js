@@ -67,8 +67,8 @@ const state = {
 
 // スナップ＆ガイド
 const guides = { x: null, y: null, active: false, threshold: 6 };
-const snapLinesX = [CANVAS_SIZE/2, CANVAS_SIZE/3, (CANVAS_SIZE*2)/3];
-const snapLinesY = [CANVAS_SIZE/2, CANVAS_SIZE/3, (CANVAS_SIZE*2)/3];
+const snapLinesX = [0, CANVAS_SIZE / 2, CANVAS_SIZE];
+const snapLinesY = [0, CANVAS_SIZE / 2, CANVAS_SIZE];
 
 function snapshot() {
   // 画像も含めて復元できる形で履歴保存（背景状態も一緒に）
@@ -96,6 +96,7 @@ function undo() {
   state.elements = reviveElements(prev.elements || []);
   bgTransparent = !!prev.bgTransparent;
   state.selectedId = state.elements.at(-1)?.id || null;
+  updateUIFromSelection();
   draw();
 }
 
@@ -114,6 +115,7 @@ function redo() {
   state.elements = reviveElements(next.elements || []);
   bgTransparent = !!next.bgTransparent;
   state.selectedId = state.elements.at(-1)?.id || null;
+  updateUIFromSelection();
   draw();
 }
 
@@ -189,6 +191,7 @@ function loadLocal(){
     exportSize = parsed.exportSize || 200;
     state.elements = reviveElements(parsed.elements || []);
     state.selectedId = state.elements.at(-1)?.id || null;
+    updateUIFromSelection();
   } catch(e){
     console.warn('loadLocal failed', e);
   }
@@ -242,6 +245,8 @@ function addText() {
     font: document.getElementById('fontFamily').value,
     align: 'center',
   });
+  state.selectedId = state.elements.at(-1)?.id || null;
+  updateUIFromSelection();
   draw();
 }
 
@@ -281,6 +286,8 @@ function addImage(file) {
         naturalHeight: ih,
         hidden: false, locked: false
       });
+      state.selectedId = state.elements.at(-1)?.id || null;
+      updateUIFromSelection();
 
       const btn = document.getElementById('centerUploadBtn');
       if (btn) btn.style.display = 'none';
@@ -783,10 +790,13 @@ function draw() {
   setupCanvasResolution();
   drawBackground();
 
-  // 画像 → 吹き出し → テキスト（hiddenはスキップ）
-  for (const el of state.elements) if (!el.hidden && el.type === 'image') drawImageEl(el);
-  for (const el of state.elements) if (!el.hidden && el.type === 'bubble') drawBubble(el);
-  for (const el of state.elements) if (!el.hidden && el.type === 'text') drawText(el);
+  // 配列順に描画（末尾ほど前面）
+  for (const el of state.elements) {
+    if (el.hidden) continue;
+    if (el.type === 'image') drawImageEl(el);
+    else if (el.type === 'bubble') drawBubble(el);
+    else if (el.type === 'text') drawText(el);
+  }
 
   const sel = state.elements.find(e => e.id === state.selectedId);
   if (sel && !sel.hidden) drawSelection(sel);
@@ -804,6 +814,10 @@ function draw() {
 function updateUIFromSelection() {
   const sel = state.elements.find(e => e.id === state.selectedId);
   if (!sel) return;
+
+  if (sel.type === 'bubble') activatePanel('bubble');
+  if (sel.type === 'text') activatePanel('text');
+
   if (sel.type === 'bubble') {
     if (bubbleWidth)  bubbleWidth.value  = Math.round(sel.w);
     if (bubbleHeight) bubbleHeight.value = Math.round(sel.h);
@@ -847,12 +861,12 @@ function hitTestHandle(x, y) {
     const el = state.elements[i];
     if (el.id !== state.selectedId) continue;
     let w, h;
-if (el.type === 'text') {
-  const m = measureTextBlock(el);
-  w = m.w; h = m.h;
-} else {
-  w = el.w; h = el.h;
-}
+    if (el.type === 'text') {
+      const m = measureTextBlock(el);
+      w = m.w; h = m.h;
+    } else {
+      w = el.w; h = el.h;
+    }
     const hs = HANDLE_HIT;
     const corners = [
       { k: 'nw', cx: el.x - w/2, cy: el.y - h/2 },
@@ -867,6 +881,71 @@ if (el.type === 'text') {
     }
   }
   return null;
+}
+
+function getElementSizeForBounds(el) {
+  if (el.type === 'text') {
+    const m = measureTextBlock(el);
+    return { w: m.w, h: m.h };
+  }
+  return { w: el.w, h: el.h };
+}
+
+function computeSnapForMove(nx, ny, el) {
+  const { w, h } = getElementSizeForBounds(el);
+  const halfW = w / 2;
+  const halfH = h / 2;
+  const threshold = guides.threshold;
+
+  const candidatesX = [
+    { key: 'left', value: nx - halfW },
+    { key: 'center', value: nx },
+    { key: 'right', value: nx + halfW },
+  ];
+  const candidatesY = [
+    { key: 'top', value: ny - halfH },
+    { key: 'middle', value: ny },
+    { key: 'bottom', value: ny + halfH },
+  ];
+
+  let bestX = null;
+  for (const c of candidatesX) {
+    for (const line of snapLinesX) {
+      const d = Math.abs(c.value - line);
+      if (d > threshold) continue;
+      if (!bestX || d < bestX.d) bestX = { ...c, line, d };
+    }
+  }
+
+  let bestY = null;
+  for (const c of candidatesY) {
+    for (const line of snapLinesY) {
+      const d = Math.abs(c.value - line);
+      if (d > threshold) continue;
+      if (!bestY || d < bestY.d) bestY = { ...c, line, d };
+    }
+  }
+
+  let snappedX = nx;
+  if (bestX) {
+    if (bestX.key === 'left') snappedX = bestX.line + halfW;
+    if (bestX.key === 'center') snappedX = bestX.line;
+    if (bestX.key === 'right') snappedX = bestX.line - halfW;
+  }
+
+  let snappedY = ny;
+  if (bestY) {
+    if (bestY.key === 'top') snappedY = bestY.line + halfH;
+    if (bestY.key === 'middle') snappedY = bestY.line;
+    if (bestY.key === 'bottom') snappedY = bestY.line - halfH;
+  }
+
+  return {
+    x: snappedX,
+    y: snappedY,
+    guideX: bestX ? bestX.line : null,
+    guideY: bestY ? bestY.line : null,
+  };
 }
 
 let dragging = false;
@@ -991,6 +1070,7 @@ canvas.addEventListener('pointerdown', (e) => {
     activeHandle = h.handle;
     resizing = true;
     snapshot();
+    updateUIFromSelection();
     draw();
     return;
   }
@@ -1055,26 +1135,18 @@ const dx = x - edgeBase.x, dy = y - edgeBase.y;
     return;
   }
 
-    // スナップ候補の計算（移動時にのみ使う）
-  function snap(val, lines){
-    for (const L of lines){
-      if (Math.abs(val - L) <= guides.threshold) return L;
-    }
-    return null;
-  }
-
-    // 移動（スナップ＆ガイド）
+  // 移動（スナップ＆ガイド）
   if (dragging) {
     let nx = x - dragOffsetX;
     let ny = y - dragOffsetY;
 
-    const sx = snap(nx, snapLinesX);
-    const sy = snap(ny, snapLinesY);
+    const snapped = computeSnapForMove(nx, ny, sel);
+    nx = snapped.x;
+    ny = snapped.y;
 
-    guides.active = false; guides.x = null; guides.y = null;
-
-    if (sx != null) { nx = sx; guides.x = sx; guides.active = true; }
-    if (sy != null) { ny = sy; guides.y = sy; guides.active = true; }
+    guides.active = snapped.guideX != null || snapped.guideY != null;
+    guides.x = snapped.guideX;
+    guides.y = snapped.guideY;
 
     sel.x = nx; sel.y = ny;
     draw();
@@ -1094,11 +1166,19 @@ canvas.addEventListener('pointercancel', () => {
 // ====== UIイベント ======
 const tabButtons = document.querySelectorAll('.tab');
 const panels = document.querySelectorAll('.panel');
-tabButtons.forEach(btn => btn.addEventListener('click', () => {
+
+function activatePanel(panelName) {
   tabButtons.forEach(b => b.classList.remove('is-active'));
   panels.forEach(p => p.classList.remove('is-active'));
-  btn.classList.add('is-active');
-  document.querySelector(`.panel[data-panel="${btn.dataset.tab}"]`).classList.add('is-active');
+
+  const activeTab = document.querySelector(`.tab[data-tab="${panelName}"]`);
+  const activePanel = document.querySelector(`.panel[data-panel="${panelName}"]`);
+  if (activeTab) activeTab.classList.add('is-active');
+  if (activePanel) activePanel.classList.add('is-active');
+}
+
+tabButtons.forEach(btn => btn.addEventListener('click', () => {
+  activatePanel(btn.dataset.tab);
 }));
 
 Array.from(document.querySelectorAll('[data-action="add-bubble"]')).forEach(b => {
@@ -1248,6 +1328,8 @@ if (redoBtn) redoBtn.addEventListener('click', redo);
 // フローティングツールバー
 document.getElementById('ftUndo')  ?.addEventListener('click', undo);
 document.getElementById('ftRedo')  ?.addEventListener('click', redo);
+document.getElementById('ftBringForward')?.addEventListener('click', () => moveSelected(+1));
+document.getElementById('ftSendBackward')?.addEventListener('click', () => moveSelected(-1));
 document.getElementById('ftDelete')?.addEventListener('click', deleteSelected);
 document.getElementById('ftReset') ?.addEventListener('click', resetBaseImage);
 
@@ -1280,34 +1362,22 @@ function renderPNGDataURL() {
   const scale = outSize / CANVAS_SIZE;
   tctx.setTransform(scale, 0, 0, scale, 0, 0);
 
-  // 画面上のキャンバス論理座標をそのまま再描画
+  // 画面上のキャンバス論理座標をそのまま再描画（配列順）
   for (const el of state.elements) {
-    if (el.type === 'image' && !el.hidden && el.img) {
-      tctx.drawImage(
-        el.img,
-        el.x - el.w / 2,
-        el.y - el.h / 2,
-        el.w,
-        el.h
-      );
-    }
-  }
-
-  for (const el of state.elements) {
-    if (el.type === 'bubble' && !el.hidden) {
+    if (el.hidden) continue;
+    if (el.type === 'image' && el.img) {
+      tctx.drawImage(el.img, el.x - el.w / 2, el.y - el.h / 2, el.w, el.h);
+    } else if (el.type === 'bubble') {
       paintBubble(tctx, el, { canvasSize: CANVAS_SIZE });
+    } else if (el.type === 'text') {
+      tctx.save();
+      tctx.fillStyle = el.color;
+      tctx.textAlign = 'center';
+      tctx.textBaseline = 'middle';
+      tctx.font = `${el.size}px ${el.font}`;
+      wrapTextHD(tctx, el.text, el.x, el.y, 240, el.size * 1.2);
+      tctx.restore();
     }
-  }
-
-  for (const el of state.elements) {
-    if (el.type !== 'text' || el.hidden) continue;
-    tctx.save();
-    tctx.fillStyle = el.color;
-    tctx.textAlign = 'center';
-    tctx.textBaseline = 'middle';
-    tctx.font = `${el.size}px ${el.font}`;
-    wrapTextHD(tctx, el.text, el.x, el.y, 240, el.size * 1.2);
-    tctx.restore();
   }
 
   return tmp.toDataURL('image/png');
