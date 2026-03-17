@@ -85,6 +85,14 @@
       <div class="panel-row">
         <button id="addTextBtn" class="btn">テキスト追加</button>
         <input id="textInput" class="input" placeholder="テキストを入力" style="max-width:320px" />
+        <select id="textPreset" class="select" style="max-width:200px">
+          <option value="standard">標準</option>
+          <option value="whiteBlack">白文字＋黒縁</option>
+          <option value="blackWhite">黒文字＋白縁</option>
+          <option value="softShadow">ふんわり影</option>
+          <option value="strong">強調</option>
+          <option value="lineStamp">LINE風</option>
+        </select>
 <!--         <label class="slider-label" style="min-width:160px">
           文字サイズ
           <input id="fontSize" type="range" min="12" max="96" value="32" />
@@ -95,6 +103,29 @@
           <option value="'Shippori Mincho', serif">明朝</option>
           <option value="'RocknRoll One', system-ui, sans-serif">ロックンロール</option>
         </select>
+        <label class="slider-label" style="min-width:150px">
+          テキスト幅
+          <input id="textMaxWidth" type="range" min="80" max="260" value="160" />
+        </label>
+        <label class="slider-label" style="min-width:130px">
+          行間
+          <input id="textLineHeight" type="range" min="1" max="1.8" step="0.05" value="1.2" />
+        </label>
+        <label class="slider-label" style="min-width:130px">
+          縁の太さ
+          <input id="textStrokeWidth" type="range" min="0" max="12" value="3" />
+        </label>
+        <label class="slider-label" style="min-width:130px">
+          影の強さ
+          <input id="textShadowStrength" type="range" min="0" max="14" value="0" />
+        </label>
+      </div>
+      <div class="panel-row">
+        <label class="chip"><input id="textStrokeEnabled" type="checkbox" style="margin-right:6px" />縁取り</label>
+        <label class="color-label">縁色
+          <input id="textStrokeColor" type="color" value="#000000" />
+        </label>
+        <label class="chip"><input id="textShadowEnabled" type="checkbox" style="margin-right:6px" />影</label>
       </div>
     </section>
 
@@ -142,6 +173,8 @@
     <div class="floating-tools" aria-label="クイック操作">
       <button id="ftUndo"   class="icon-btn" title="元に戻す">↶</button>
       <button id="ftRedo"   class="icon-btn" title="やり直す">↷</button>
+      <button id="ftBringForward" class="icon-btn" title="前面へ">↑</button>
+      <button id="ftSendBackward" class="icon-btn" title="背面へ">↓</button>
       <button id="ftDelete" class="icon-btn" title="選択削除">🗑</button>
       <button id="ftReset"  class="icon-btn" title="ベース画像を中央に戻す">◎</button>
       <button id="resetBtn" class="icon-btn" title="初期状態に戻す">⟲</button>
