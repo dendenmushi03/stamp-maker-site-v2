@@ -1,11 +1,12 @@
 :root {
-  --bg: #0f1115;
-  --panel: rgba(255,255,255,0.06);
-  --card: rgba(255,255,255,0.08);
-  --text: #e7eaf0;
-  --muted: #b3b8c5;
-  --brand: #5ca7ff;
-  --shadow: 0 8px 24px rgba(0,0,0,0.25);
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #64748b;
+  --brand: #2563eb;
+  --line: #dbe2ea;
+  --shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
   --radius: 18px;
   --page-max: 980px; /* ← ここだけ変えれば全ページで幅を揃えられる */
 }
@@ -44,7 +45,7 @@ html, body { height: 100%; }
 body {
   margin: 0;
   color: var(--text);
-  background: radial-gradient(1200px 600px at 50% -20%, #1a2030, #0b0d12 60%), var(--bg);
+  background: radial-gradient(1200px 600px at 50% -20%, #ffffff, #f5f7fb 60%), var(--bg);
   font: 16px/1.5 "Noto Sans JP", system-ui, -apple-system, sans-serif;
 }
 
@@ -54,8 +55,9 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px;
   backdrop-filter: saturate(1.1) blur(8px);
-  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.1));
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.9);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 /* 左上のブランドをロゴ画像に差し替え（HTML変更なし） */
 .brand{
@@ -80,8 +82,10 @@ body {
 .icon-btn {
   min-width: 44px; height: 44px; border-radius: 50%;
   padding: 0 10px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: var(--card); color: var(--text); box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.07);
 }
 
 .icon-btn:active { transform: translateY(1px); }
@@ -103,13 +107,13 @@ body {
 #editorCanvas {
   width: 92dvw; max-width: 560px; aspect-ratio: 1 / 1;
   border-radius: 22px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid var(--line);
   box-shadow: var(--shadow);
   background-image:
-    linear-gradient(45deg, #2a2f3f 25%, transparent 25%),
-    linear-gradient(-45deg, #2a2f3f 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #2a2f3f 75%),
-    linear-gradient(-45deg, transparent 75%, #2a2f3f 75%);
+    linear-gradient(45deg, #e8eef5 25%, transparent 25%),
+    linear-gradient(-45deg, #e8eef5 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e8eef5 75%),
+    linear-gradient(-45deg, transparent 75%, #e8eef5 75%);
   background-size: 20px 20px;
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
   position: relative;
@@ -163,8 +167,8 @@ body {
 #centerUploadBtn.center-upload-btn {
   position: absolute;
   left: 50%; top: 50%; transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.15);
-  border: 2px dashed rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.95);
+  border: 2px dashed #c8d3e1;
   color: var(--text);
   font-size: 16px;
   padding: 12px 20px;
@@ -181,9 +185,9 @@ body {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   padding: 8px 12px;
   position: sticky; bottom: 0; z-index: 15;
-  background: rgba(0,0,0,0.35);
+  background: rgba(255,255,255,0.94);
   backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid var(--line);
   /* 追加：センタリング＆定幅 */
   width: 100%;
   max-width: var(--page-max);
@@ -192,19 +196,19 @@ body {
 
 .tab {
   height: 44px; border-radius: var(--radius);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--line);
   background: var(--panel); color: var(--text); font-weight: 600;
 }
 
 .tab.is-active {
   outline: 2px solid var(--brand);
-  background: linear-gradient(180deg, rgba(92,167,255,0.25), rgba(92,167,255,0.08));
+  background: linear-gradient(180deg, rgba(59,130,246,0.15), rgba(59,130,246,0.04));
 }
 
 .panel {
   display: none; gap: 12px; padding: 8px 12px 16px;
-  background: rgba(255,255,255,0.02);
-  border-top: 1px solid rgba(255,255,255,0.06);
+  background: #f8fafc;
+  border-top: 1px solid var(--line);
   /* 追加：センタリング＆定幅 */
   width: 100%;
   max-width: var(--page-max);
@@ -218,26 +222,34 @@ body {
 .btn {
   height: 44px; padding: 0 14px;
   border-radius: var(--radius);
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid var(--line);
   background: var(--card); color: var(--text);
-  font-weight: 700; box-shadow: var(--shadow);
+  font-weight: 700; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
-.btn.primary { background: linear-gradient(180deg, #5ca7ff, #3b8cff); border: none; color: #08121f; }
-.btn.ghost   { background: transparent; border: 1px dashed rgba(255,255,255,0.25); }
+.btn.primary { background: linear-gradient(180deg, #3b82f6, #2563eb); border: none; color: #ffffff; }
+.btn.ghost   { background: transparent; border: 1px dashed #c8d3e1; }
 .btn:active  { transform: translateY(1px); }
 
 .chip { height: 40px; padding: 0 12px; border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.06); color: var(--text); font-weight: 700;
+  border: 1px solid var(--line);
+  background: #ffffff; color: var(--text); font-weight: 700;
 }
 .input, .select {
   height: 44px; border-radius: var(--radius);
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.06); color: var(--text);
+  border: 1px solid var(--line);
+  background: #ffffff; color: var(--text);
   padding: 0 12px; width: 100%;
 }
+.input:focus, .select:focus, .btn:focus-visible, .chip:focus-visible, .tab:focus-visible {
+  outline: 3px solid rgba(37,99,235,0.25);
+  outline-offset: 1px;
+}
+.select { appearance: none; }
 .slider-label, .color-label {
   display: grid; gap: 6px; font-size: 12px; color: var(--muted);
+}
+.slider-label input[type="range"] {
+  accent-color: var(--brand);
 }
 .hint { color: var(--muted); font-size: 12px; }
 
@@ -245,7 +257,7 @@ body {
 .save-result { display: grid; place-items: center; gap: 10px; }
 #previewImg {
   width: 220px; height: 220px; object-fit: contain;
-  border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; border: 1px solid var(--line);
 }
 
 /* iOS セーフエリア */
@@ -280,10 +292,10 @@ body {
   height: 48px;
   border-radius: 50%;
   backdrop-filter: blur(6px);
-  background: rgba(255,255,255,0.85);
-  color: #0b0d12;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  background: rgba(255,255,255,0.96);
+  color: var(--text);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
 }
 .floating-tools .icon-btn:active{ transform: translateY(1px); }
 
@@ -314,10 +326,10 @@ html, body {
   max-height: 70vh;
   overflow: auto;
   background: rgba(255,255,255,0.95);
-  color: #0b0d12;
-  border: 1px solid #e5e7eb;
+  color: var(--text);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
   padding: 8px;
   z-index: 50;              /* ← ヘッダー(z-index:20)より前に出す */
 }
@@ -331,9 +343,9 @@ html, body {
   height: 44px; min-width: 88px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #fff; color: #0b0d12; font-weight: 700;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  border: 1px solid var(--line);
+  background: #fff; color: var(--text); font-weight: 700;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
 }
 
 /* 閉じたときに画面外へスライド */
@@ -359,15 +371,15 @@ html, body {
   display: grid; grid-template-columns: 1fr auto auto; gap: 6px;
   align-items: center; padding: 6px 8px; border-radius: 10px; cursor: pointer;
 }
-.layer-item:hover{ background: #f3f4f6; }
-.layer-item.is-active{ background: #e5f0ff; }
+.layer-item:hover{ background: #f1f5f9; }
+.layer-item.is-active{ background: #e8f0ff; }
 .layer-item__name{ font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .layer-item__btn{
   width: 28px; height: 28px; border-radius: 8px;
-  border: 1px solid #e5e7eb; background: #ffffff; cursor: pointer;
+  border: 1px solid var(--line); background: #ffffff; cursor: pointer;
 }
 .layer-item__btn:active{ transform: translateY(1px); }
-.layer-panel__legend{ margin-top: 6px; font-size: 12px; color: #6b7280; }
+.layer-panel__legend{ margin-top: 6px; font-size: 12px; color: var(--muted); }
 
 /* ガイド線 */
 .canvas-guide-line{
@@ -398,24 +410,24 @@ html, body {
   gap: .4rem;
   padding: .6rem 1rem;
   border-radius: 9999px;           /* 丸いピル形 */
-  border: 1px solid rgba(255,255,255,.25);
-  background: #2b2f36;             /* 他ボタンと同系のダーク */
-  color: #fff;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--text);
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,.08);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 [data-action="add-bubble"]:hover{
-  background: #353a42;
-  border-color: rgba(255,255,255,.35);
+  background: #f8fbff;
+  border-color: #bfccdc;
 }
 [data-action="add-bubble"]:active{
   transform: translateY(1px);
 }
 [data-action="add-bubble"]:focus{
   outline: none;
-  box-shadow: 0 0 0 3px rgba(92,167,255,.35);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.25);
 }
 
 /* 横並びの間隔（連続するボタン間） */
@@ -433,38 +445,23 @@ html, body {
   gap: .4rem;
   padding: .6rem 1rem;
   border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,.25);
-  background: #2b2f36;
-  color: #fff;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--text);
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,.08);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 .tab__btn[data-action="add-bubble"]:hover{
-  background: #353a42;
-  border-color: rgba(255,255,255,.35);
+  background: #f8fbff;
+  border-color: #bfccdc;
 }
-.tab__btn[data-action="add-bubble"]:active{
-  transform: translateY(1px);
-}
+.tab__btn[data-action="add-bubble"]:active{ transform: translateY(1px); }
 .tab__btn[data-action="add-bubble"]:focus{
   outline: none;
-  box-shadow: 0 0 0 3px rgba(92,167,255,.35);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.25);
 }
-
-/* 連続配置時の余白も同じに */
-[data-action="add-bubble"] + .tab__btn[data-action="add-bubble"],
-.tab__btn[data-action="add-bubble"] + [data-action="add-bubble"],
-.tab__btn[data-action="add-bubble"] + .tab__btn[data-action="add-bubble"]{
-  margin-left: .5rem;
-}
-
-/* .tab__btn（burst用）も同じ見た目に揃える */
-.tab__btn[data-action="add-bubble"]{ ...同等の見た目... }
-.tab__btn[data-action="add-bubble"]:hover{ ... }
-.tab__btn[data-action="add-bubble"]:active{ ... }
-.tab__btn[data-action="add-bubble"]:focus{ ... }
 
 /* 連続配置時の余白も同じに */
 [data-action="add-bubble"] + .tab__btn[data-action="add-bubble"],
@@ -538,7 +535,7 @@ html, body {
 /* ステップカード */
 .howto-card{
   background: var(--panel);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 14px;
@@ -556,7 +553,7 @@ html, body {
   width: 100%;
   height: auto;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid var(--line);
   box-shadow: var(--shadow);
 }
 
@@ -602,30 +599,30 @@ html, body {
   height: 44px;
   padding: 0 16px;
   border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
   color: var(--text);
   font-weight: 800;
   letter-spacing: .01em;
   text-decoration: none;                /* 下線を消す */
-  box-shadow: 0 10px 24px rgba(0,0,0,.22), inset 0 0 0 1px rgba(255,255,255,.06);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(8px);
   transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
 }
 .app-header .header-actions a:hover,
 .howto-button:hover{
   transform: translateY(-1px);
-  background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06));
-  box-shadow: 0 14px 28px rgba(0,0,0,.28);
+  background: linear-gradient(180deg, #ffffff, #f1f5fb);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
 }
 .app-header .header-actions a:active,
 .howto-button:active{
   transform: translateY(0);
-  box-shadow: 0 8px 20px rgba(0,0,0,.22);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
 }
 .app-header .header-actions a:focus-visible,
 .howto-button:focus-visible{
-  outline: 3px solid rgba(92,167,255,.45);
+  outline: 3px solid rgba(37,99,235,.35);
   outline-offset: 2px;
 }
 
@@ -637,8 +634,8 @@ html, body {
   place-items: center;
   width: 22px; height: 22px;
   border-radius: 9999px;
-  background: rgba(92,167,255,.22);
-  box-shadow: inset 0 0 0 1px rgba(92,167,255,.35);
+  background: rgba(37,99,235,.16);
+  box-shadow: inset 0 0 0 1px rgba(37,99,235,.3);
   font-weight: 900;
   line-height: 1;
   transition: transform .15s ease;
