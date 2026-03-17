@@ -6,6 +6,7 @@ console.log('BUILD MARKER ZZZ5');
 // ====== 基本設定 ======
 const canvas = document.getElementById('editorCanvas');
 const ctx = canvas.getContext('2d');
+const CANVAS_SIZE = 200;
 let bgTransparent = true;
 let exportSize = 200;
 
@@ -35,9 +36,23 @@ window.addEventListener('resize', () => {
   TAIL_BASE_DRAW_R = m ? 5.0 : 4.0;
 }, { passive: true });
 
-// 論理サイズは 300x300 固定（見た目はCSSで拡大）
-canvas.width = 200;
-canvas.height = 200;
+// 論理座標は固定（見た目サイズはCSS、内部解像度はDPRで強化）
+function setupCanvasResolution() {
+  const rect = canvas.getBoundingClientRect();
+  const displayW = Math.max(1, Math.round(rect.width || CANVAS_SIZE));
+  const displayH = Math.max(1, Math.round(rect.height || CANVAS_SIZE));
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const pixelW = Math.round(displayW * dpr);
+  const pixelH = Math.round(displayH * dpr);
+
+  if (canvas.width !== pixelW || canvas.height !== pixelH) {
+    canvas.width = pixelW;
+    canvas.height = pixelH;
+  }
+
+  // 論理座標(0..CANVAS_SIZE)をそのまま使えるように変換
+  ctx.setTransform(canvas.width / CANVAS_SIZE, 0, 0, canvas.height / CANVAS_SIZE, 0, 0);
+}
 
 // 角丸長方形の統一半径（描画・ヒット・書き出しで共通）
 const RECT_R = 18;
@@ -52,8 +67,8 @@ const state = {
 
 // スナップ＆ガイド
 const guides = { x: null, y: null, active: false, threshold: 6 };
-const snapLinesX = [canvas.width/2, canvas.width/3, (canvas.width*2)/3]; // 150,100,200
-const snapLinesY = [canvas.height/2, canvas.height/3, (canvas.height*2)/3]; // 150,100,200
+const snapLinesX = [CANVAS_SIZE/2, CANVAS_SIZE/3, (CANVAS_SIZE*2)/3];
+const snapLinesY = [CANVAS_SIZE/2, CANVAS_SIZE/3, (CANVAS_SIZE*2)/3];
 
 function snapshot() {
   // 画像も含めて復元できる形で履歴保存（背景状態も一緒に）
@@ -106,35 +121,45 @@ function redo() {
 const LS_KEY = 'stampMakerStateV1';
 
 function serializeElements(els){
-  return els.map(el=>{
-    if (el.type === 'image' && el.img) {
-      // 画像をDataURL化して保存（Blob URLは復元不可のため）
-      try {
-        const off = document.createElement('canvas');
-        off.width = Math.max(1, Math.round(el.w));
-        off.height = Math.max(1, Math.round(el.h));
-        const octx = off.getContext('2d');
-        octx.drawImage(el.img, 0, 0, off.width, off.height);
-        const dataUrl = off.toDataURL('image/png');
-        return { ...el, img: undefined, dataUrl };
-      } catch(e) {
-        console.warn('serialize image failed', e);
-        return { ...el, img: undefined, dataUrl: null };
-      }
-    }
-    return el;
+  return els.map(el => {
+    if (el.type !== 'image') return el;
+
+    const sourceDataUrl = el.originalDataUrl
+      || (typeof el.img?.src === 'string' && el.img.src.startsWith('data:') ? el.img.src : null)
+      || el.dataUrl
+      || null;
+
+    const { img, dataUrl, ...rest } = el;
+    return {
+      ...rest,
+      originalDataUrl: sourceDataUrl,
+      naturalWidth: el.naturalWidth || el.img?.naturalWidth || null,
+      naturalHeight: el.naturalHeight || el.img?.naturalHeight || null,
+    };
   });
 }
 
 function reviveElements(raw){
   const out = [];
   for (const el of raw) {
-    if (el.type === 'image' && el.dataUrl) {
+    if (el.type === 'image') {
+      const sourceDataUrl = el.originalDataUrl || el.dataUrl || null; // dataUrlは旧互換
+      if (!sourceDataUrl) {
+        const { img, ...rest } = el;
+        out.push(rest);
+        continue;
+      }
       const img = new Image();
       img.onload = () => draw();
-      img.src = el.dataUrl;
-      const {dataUrl, ...rest} = el;
-      out.push({ ...rest, img });
+      img.src = sourceDataUrl;
+      const { dataUrl, ...rest } = el;
+      out.push({
+        ...rest,
+        originalDataUrl: sourceDataUrl,
+        naturalWidth: rest.naturalWidth || null,
+        naturalHeight: rest.naturalHeight || null,
+        img,
+      });
     } else {
       out.push(el);
     }
@@ -182,7 +207,7 @@ function addBubble(shape = 'round') {
   const el = {
     id: genId(),
     type: 'bubble',
-    shape, x: canvas.width / 2, y: canvas.height / 2, w: 150, h: 110,
+    shape, x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2, w: 150, h: 110,
     hidden: false, locked: false,
     fill: document.getElementById('fillColor').value,
     stroke: document.getElementById('strokeColor').value,
@@ -222,12 +247,15 @@ function addText() {
 
 function addImage(file) {
   console.log('[addImage] file:', file && file.name, file && file.size);
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = async () => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const originalDataUrl = reader.result;
+    if (typeof originalDataUrl !== 'string') return;
+
+    const img = new Image();
+    img.onload = async () => {
     try {
       try { await img.decode?.(); } catch {}
-      URL.revokeObjectURL(url);
 
       snapshot();
 
@@ -235,16 +263,22 @@ function addImage(file) {
       const ih = img.naturalHeight || img.height;
       if (!iw || !ih) { console.error('[addImage] invalid image size'); return; }
 
-      const scale = Math.min(canvas.width / iw, canvas.height / ih);
+      const maxW = CANVAS_SIZE;
+      const maxH = CANVAS_SIZE;
+      const scale = Math.min(maxW / iw, maxH / ih, 1);
       const w = Math.max(1, Math.round(iw * scale));
       const h = Math.max(1, Math.round(ih * scale));
 
-            state.elements.push({
+      state.elements.push({
         id: genId(),
         type: 'image',
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        w, h, img,
+        x: (CANVAS_SIZE - w) / 2 + w / 2,
+        y: (CANVAS_SIZE - h) / 2 + h / 2,
+        w, h,
+        img,
+        originalDataUrl,
+        naturalWidth: iw,
+        naturalHeight: ih,
         hidden: false, locked: false
       });
 
@@ -254,9 +288,12 @@ function addImage(file) {
     } catch (err) {
       console.error('[addImage] onload handler error', err);
     }
+    };
+    img.onerror = (e) => console.error('[addImage] failed to load image', e);
+    img.src = originalDataUrl;
   };
-  img.onerror = (e) => console.error('[addImage] failed to load image', e);
-  img.src = url;
+  reader.onerror = (e) => console.error('[addImage] failed to read image file', e);
+  reader.readAsDataURL(file);
 }
 
 // ベース画像（最初の image 要素）をキャンバス中央＆フィットに戻す
@@ -270,11 +307,11 @@ function resetBaseImage(){
   const ih = imgEl.img.naturalHeight || imgEl.img.height;
   if (!iw || !ih) return;
 
-  const scale = Math.min(canvas.width / iw, canvas.height / ih);
+  const scale = Math.min(CANVAS_SIZE / iw, CANVAS_SIZE / ih, 1);
   imgEl.w = Math.max(1, Math.round(iw * scale));
   imgEl.h = Math.max(1, Math.round(ih * scale));
-  imgEl.x = canvas.width / 2;
-  imgEl.y = canvas.height / 2;
+  imgEl.x = CANVAS_SIZE / 2;
+  imgEl.y = CANVAS_SIZE / 2;
 
   draw();
 }
@@ -303,10 +340,10 @@ function resetAll() {
 
 // ====== 描画 ======
 function drawBackground() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   if (!bgTransparent) {
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
   }
 }
 
@@ -413,7 +450,7 @@ ctx.restore();
 
     // --- 外側クリップ（大きな矩形 − 本体形状）---
     ctx.beginPath();
-    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.rect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
     ctx.save();
     ctx.translate(el.x, el.y);
@@ -578,13 +615,13 @@ function drawGuides(){
   if (guides.x != null) {
     ctx.beginPath();
     ctx.moveTo(guides.x, 0);
-    ctx.lineTo(guides.x, canvas.height);
+    ctx.lineTo(guides.x, CANVAS_SIZE);
     ctx.stroke();
   }
   if (guides.y != null) {
     ctx.beginPath();
     ctx.moveTo(0, guides.y);
-    ctx.lineTo(canvas.width, guides.y);
+    ctx.lineTo(CANVAS_SIZE, guides.y);
     ctx.stroke();
   }
   ctx.restore();
@@ -640,6 +677,8 @@ function measureTextBlock(el) {
 
 function drawImageEl(el) {
   ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(el.img, el.x - el.w/2, el.y - el.h/2, el.w, el.h);
   ctx.restore();
 }
@@ -703,6 +742,7 @@ ctx.stroke();
 }
 
 function draw() {
+  setupCanvasResolution();
   drawBackground();
 
   // 画像 → 吹き出し → テキスト（hiddenはスキップ）
@@ -831,8 +871,8 @@ function pointerPos(evt) {
   const rect = canvas.getBoundingClientRect();
   const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
   const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
-  const x = (clientX - rect.left) * (canvas.width / rect.width);
-  const y = (clientY - rect.top) * (canvas.height / rect.height);
+  const x = (clientX - rect.left) * (CANVAS_SIZE / rect.width);
+  const y = (clientY - rect.top) * (CANVAS_SIZE / rect.height);
   return { x, y };
 }
 
@@ -1202,6 +1242,8 @@ function renderPNGDataURL() {
     tmp.width = outW;
     tmp.height = outH;
     const tctx = tmp.getContext('2d');
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
 
     // 背景（白/透過）— ここでは“トリミングされた範囲”だけ塗る
     if (!bgTransparent) {
@@ -1421,11 +1463,13 @@ if (tail) {
   tmp.width = EXPORT_SIZE;
   tmp.height = EXPORT_SIZE;
   const tctx = tmp.getContext('2d');
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = 'high';
   if (!bgTransparent) {
     tctx.fillStyle = '#ffffff';
     tctx.fillRect(0, 0, tmp.width, tmp.height);
   }
-  const s = EXPORT_SIZE / canvas.width;
+  const s = EXPORT_SIZE / CANVAS_SIZE;
 
   // ===== 画像層 =====
   for (const el of state.elements) {
@@ -1863,6 +1907,12 @@ layerDelBtn?.addEventListener('click', ()=>{
 });
 
 // ====== 初期ロード（ローカル復元）→ 描画 ======
+setupCanvasResolution();
+window.addEventListener('resize', () => {
+  setupCanvasResolution();
+  draw();
+}, { passive: true });
+
 loadLocal();
 
 // ローカル保存が無い初回のみ、スライダーの初期値をデフォルトへ
