@@ -163,7 +163,7 @@ function reviveElements(raw){
         img,
       });
     } else {
-      out.push(el);
+      out.push(normalizeTextElement(el));
     }
   }
   return out;
@@ -200,6 +200,127 @@ function loadLocal(){
 // ====== 要素生成 ======
 const genId = () => Math.random().toString(36).slice(2, 9);
 
+const TEXT_PRESETS = {
+  standard: {
+    name: '標準',
+    color: '#111111',
+    lineHeight: 1.2,
+    strokeEnabled: false,
+    strokeColor: '#000000',
+    strokeWidth: 3,
+    shadowEnabled: false,
+    shadowColor: 'rgba(0,0,0,0.25)',
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    fontWeight: 700,
+  },
+  whiteBlack: {
+    name: '白文字＋黒縁',
+    color: '#ffffff',
+    lineHeight: 1.2,
+    strokeEnabled: true,
+    strokeColor: '#111111',
+    strokeWidth: 4,
+    shadowEnabled: false,
+    shadowColor: 'rgba(0,0,0,0.25)',
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    fontWeight: 800,
+  },
+  blackWhite: {
+    name: '黒文字＋白縁',
+    color: '#111111',
+    lineHeight: 1.2,
+    strokeEnabled: true,
+    strokeColor: '#ffffff',
+    strokeWidth: 4,
+    shadowEnabled: false,
+    shadowColor: 'rgba(0,0,0,0.2)',
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    fontWeight: 800,
+  },
+  softShadow: {
+    name: 'ふんわり影',
+    color: '#ffffff',
+    lineHeight: 1.25,
+    strokeEnabled: true,
+    strokeColor: '#1f2937',
+    strokeWidth: 2,
+    shadowEnabled: true,
+    shadowColor: 'rgba(0,0,0,0.35)',
+    shadowBlur: 6,
+    shadowOffsetX: 0,
+    shadowOffsetY: 2,
+    fontWeight: 800,
+  },
+  strong: {
+    name: '強調',
+    color: '#ffe45e',
+    lineHeight: 1.1,
+    strokeEnabled: true,
+    strokeColor: '#111111',
+    strokeWidth: 5,
+    shadowEnabled: true,
+    shadowColor: 'rgba(0,0,0,0.4)',
+    shadowBlur: 4,
+    shadowOffsetX: 0,
+    shadowOffsetY: 2,
+    fontWeight: 900,
+  },
+  lineStamp: {
+    name: 'LINE風',
+    color: '#ffffff',
+    lineHeight: 1.15,
+    strokeEnabled: true,
+    strokeColor: '#00b900',
+    strokeWidth: 6,
+    shadowEnabled: false,
+    shadowColor: 'rgba(0,0,0,0.2)',
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    fontWeight: 900,
+  },
+};
+let defaultTextPreset = 'standard';
+
+function applyTextPresetToElement(el, presetName) {
+  const preset = TEXT_PRESETS[presetName] || TEXT_PRESETS.standard;
+  el.presetName = presetName in TEXT_PRESETS ? presetName : 'standard';
+  el.color = preset.color;
+  el.lineHeight = preset.lineHeight;
+  el.strokeEnabled = preset.strokeEnabled;
+  el.strokeColor = preset.strokeColor;
+  el.strokeWidth = preset.strokeWidth;
+  el.shadowEnabled = preset.shadowEnabled;
+  el.shadowColor = preset.shadowColor;
+  el.shadowBlur = preset.shadowBlur;
+  el.shadowOffsetX = preset.shadowOffsetX;
+  el.shadowOffsetY = preset.shadowOffsetY;
+  el.fontWeight = preset.fontWeight;
+}
+
+function normalizeTextElement(el) {
+  if (!el || el.type !== 'text') return el;
+  if (!el.presetName) el.presetName = defaultTextPreset;
+  if (el.maxWidth == null) el.maxWidth = 160;
+  if (el.lineHeight == null) el.lineHeight = 1.2;
+  if (el.strokeEnabled == null) el.strokeEnabled = false;
+  if (!el.strokeColor) el.strokeColor = '#000000';
+  if (el.strokeWidth == null) el.strokeWidth = 3;
+  if (el.shadowEnabled == null) el.shadowEnabled = false;
+  if (!el.shadowColor) el.shadowColor = 'rgba(0,0,0,0.25)';
+  if (el.shadowBlur == null) el.shadowBlur = 0;
+  if (el.shadowOffsetX == null) el.shadowOffsetX = 0;
+  if (el.shadowOffsetY == null) el.shadowOffsetY = 0;
+  if (el.fontWeight == null) el.fontWeight = 700;
+  return el;
+}
+
 function addBubble(shape = 'round') {
   snapshot();
 
@@ -234,7 +355,7 @@ function addBubble(shape = 'round') {
 function addText() {
   snapshot();
   const fsInput = document.getElementById('fontSize'); // ← 無いHTMLでもOKに
-  state.elements.push({
+  const textEl = normalizeTextElement({
     id: genId(),
     type: 'text',
     x: 150, y: 150,
@@ -244,7 +365,11 @@ function addText() {
     size: parseInt(fsInput?.value ?? 32, 10),  // ← デフォルト32
     font: document.getElementById('fontFamily').value,
     align: 'center',
+    maxWidth: 160,
+    presetName: defaultTextPreset,
   });
+  applyTextPresetToElement(textEl, textEl.presetName);
+  state.elements.push(textEl);
   state.selectedId = state.elements.at(-1)?.id || null;
   updateUIFromSelection();
   draw();
@@ -644,12 +769,86 @@ function burstPath(w, h) {
   ctx.closePath();
 }
 
+function getTextFont(el) {
+  return `${el.fontWeight ?? 700} ${el.size}px ${el.font}`;
+}
+
+function layoutText(c, el) {
+  const content = String(el.text ?? '');
+  const maxWidth = Math.max(40, Number(el.maxWidth ?? 160));
+  const lineHeightPx = (el.size || 32) * (el.lineHeight || 1.2);
+
+  c.save();
+  c.font = getTextFont(el);
+
+  const lines = [];
+  const paragraphs = content.split('\n');
+  for (const p of paragraphs) {
+    const chars = Array.from(p);
+    if (!chars.length) {
+      lines.push('');
+      continue;
+    }
+    let line = '';
+    for (const ch of chars) {
+      const test = line + ch;
+      if (line && c.measureText(test).width > maxWidth) {
+        lines.push(line);
+        line = ch;
+      } else {
+        line = test;
+      }
+    }
+    lines.push(line);
+  }
+
+  const maxLineW = lines.reduce((m, l) => Math.max(m, c.measureText(l).width), 0);
+  c.restore();
+
+  return {
+    lines,
+    width: Math.min(maxWidth, Math.ceil(maxLineW)),
+    lineHeightPx,
+    height: Math.max(lineHeightPx, lines.length * lineHeightPx),
+  };
+}
+
+function drawTextElement(c, el) {
+  const t = normalizeTextElement(el);
+  const layout = layoutText(c, t);
+  const startY = t.y - layout.height / 2 + layout.lineHeightPx / 2;
+
+  c.save();
+  c.font = getTextFont(t);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+
+  if (t.strokeEnabled && t.strokeWidth > 0) {
+    c.lineJoin = 'round';
+    c.lineCap = 'round';
+    c.lineWidth = t.strokeWidth;
+    c.strokeStyle = t.strokeColor;
+    layout.lines.forEach((line, i) => {
+      c.strokeText(line, t.x, startY + i * layout.lineHeightPx);
+    });
+  }
+
+  if (t.shadowEnabled) {
+    c.shadowColor = t.shadowColor;
+    c.shadowBlur = t.shadowBlur;
+    c.shadowOffsetX = t.shadowOffsetX;
+    c.shadowOffsetY = t.shadowOffsetY;
+  }
+
+  c.fillStyle = t.color;
+  layout.lines.forEach((line, i) => {
+    c.fillText(line, t.x, startY + i * layout.lineHeightPx);
+  });
+  c.restore();
+}
+
 function drawText(el) {
-  ctx.save();
-  ctx.fillStyle = el.color; ctx.font = `${el.size}px ${el.font}`; ctx.textAlign = el.align; ctx.textBaseline = 'middle';
-  ctx.translate(el.x, el.y);
-  wrapText(el.text, 0, 0, 240, el.size * 1.2);
-  ctx.restore();
+  drawTextElement(ctx, el);
 }
 
 function drawGuides(){
@@ -672,51 +871,14 @@ function drawGuides(){
   ctx.restore();
 }
 
-function wrapText(text, x, y, maxWidth, lineHeight) {
-  const words = text.split(/\s+/);
-  let line = '';
-  const lines = [];
-  for (let n=0; n<words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && n>0) { lines.push(line); line = words[n] + ' '; }
-    else { line = testLine; }
-  }
-  lines.push(line);
-  const offsetY = -((lines.length-1) * lineHeight) / 2;
-  lines.forEach((l, i) => ctx.fillText(l.trim(), x, y + offsetY + i*lineHeight));
-}
-
 // テキスト選択枠の実寸（描画に合わせて折り返し考慮）
 function measureTextBlock(el) {
-  const maxWidth = 240;                 // 描画と同じ制限幅
-  const lineHeight = el.size * 1.2;
-  ctx.save();
-  ctx.font = `${el.size}px ${el.font}`;
-
-  const words = (el.text || '').split(/\s+/);
-  let line = '';
-  const lines = [];
-  let maxLineW = 0;
-
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const w = ctx.measureText(testLine).width;
-    if (w > maxWidth && n > 0) {
-      lines.push(line.trimEnd());
-      maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
-      line = words[n] + ' ';
-    } else {
-      line = testLine;
-    }
-  }
-  lines.push(line.trimEnd());
-  maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
-  ctx.restore();
-
-  // 少し余白を足す（左右10, 上下8）
-  const w = Math.min(maxWidth, Math.ceil(maxLineW)) + 20;
-  const h = Math.max(lineHeight, lines.length * lineHeight) + 16;
+  const t = normalizeTextElement(el);
+  const layout = layoutText(ctx, t);
+  const fx = Math.max(t.strokeEnabled ? t.strokeWidth : 0, t.shadowEnabled ? (Math.abs(t.shadowOffsetX) + t.shadowBlur) : 0);
+  const fy = Math.max(t.strokeEnabled ? t.strokeWidth : 0, t.shadowEnabled ? (Math.abs(t.shadowOffsetY) + t.shadowBlur) : 0);
+  const w = layout.width + 20 + fx * 2;
+  const h = layout.height + 16 + fy * 2;
   return { w, h };
 }
 
@@ -833,12 +995,29 @@ function updateUIFromSelection() {
     }
   }
   if (sel.type === 'text') {
+    normalizeTextElement(sel);
     const fs = document.getElementById('fontSize');
     if (fs) fs.value = sel.size ?? 32;
     const tc = document.getElementById('textColor');
     if (tc) tc.value = sel.color ?? '#000000';
     const ti = document.getElementById('textInput');
     if (ti) ti.value = sel.text ?? '';
+    const tp = document.getElementById('textPreset');
+    if (tp) tp.value = sel.presetName ?? 'standard';
+    const tmw = document.getElementById('textMaxWidth');
+    if (tmw) tmw.value = sel.maxWidth ?? 160;
+    const tlh = document.getElementById('textLineHeight');
+    if (tlh) tlh.value = sel.lineHeight ?? 1.2;
+    const tse = document.getElementById('textStrokeEnabled');
+    if (tse) tse.checked = !!sel.strokeEnabled;
+    const tsc = document.getElementById('textStrokeColor');
+    if (tsc) tsc.value = sel.strokeColor ?? '#000000';
+    const tsw = document.getElementById('textStrokeWidth');
+    if (tsw) tsw.value = sel.strokeWidth ?? 3;
+    const tsh = document.getElementById('textShadowEnabled');
+    if (tsh) tsh.checked = !!sel.shadowEnabled;
+    const tss = document.getElementById('textShadowStrength');
+    if (tss) tss.value = sel.shadowBlur ?? 0;
   }
 }
 
@@ -1207,6 +1386,89 @@ document.getElementById('fontFamily').addEventListener('change', (e) => {
 });
 document.getElementById('fontFamily').addEventListener('change', snapshot);
 
+const textPresetInput = document.getElementById('textPreset');
+if (textPresetInput?.value) defaultTextPreset = textPresetInput.value;
+textPresetInput?.addEventListener('change', (e) => {
+  const name = e.target.value;
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) {
+    defaultTextPreset = name;
+    return;
+  }
+  snapshot();
+  applyTextPresetToElement(sel, name);
+  draw();
+  updateUIFromSelection();
+});
+
+const textMaxWidthInput = document.getElementById('textMaxWidth');
+textMaxWidthInput?.addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  sel.maxWidth = parseInt(e.target.value, 10);
+  draw();
+});
+textMaxWidthInput?.addEventListener('change', snapshot);
+
+const textLineHeightInput = document.getElementById('textLineHeight');
+textLineHeightInput?.addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  sel.lineHeight = parseFloat(e.target.value);
+  draw();
+});
+textLineHeightInput?.addEventListener('change', snapshot);
+
+const textStrokeEnabledInput = document.getElementById('textStrokeEnabled');
+textStrokeEnabledInput?.addEventListener('change', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  snapshot();
+  sel.strokeEnabled = !!e.target.checked;
+  draw();
+});
+
+const textStrokeColorInput = document.getElementById('textStrokeColor');
+textStrokeColorInput?.addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  sel.strokeColor = e.target.value;
+  draw();
+});
+textStrokeColorInput?.addEventListener('change', snapshot);
+
+const textStrokeWidthInput = document.getElementById('textStrokeWidth');
+textStrokeWidthInput?.addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  sel.strokeWidth = parseInt(e.target.value, 10);
+  sel.strokeEnabled = sel.strokeWidth > 0;
+  draw();
+});
+textStrokeWidthInput?.addEventListener('change', snapshot);
+
+const textShadowEnabledInput = document.getElementById('textShadowEnabled');
+textShadowEnabledInput?.addEventListener('change', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  snapshot();
+  sel.shadowEnabled = !!e.target.checked;
+  draw();
+});
+
+const textShadowStrengthInput = document.getElementById('textShadowStrength');
+textShadowStrengthInput?.addEventListener('input', (e) => {
+  const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'text');
+  if (!sel) return;
+  const s = parseInt(e.target.value, 10);
+  sel.shadowBlur = s;
+  sel.shadowOffsetX = 0;
+  sel.shadowOffsetY = Math.round(s * 0.35);
+  sel.shadowEnabled = s > 0;
+  draw();
+});
+textShadowStrengthInput?.addEventListener('change', snapshot);
+
 
 document.getElementById('fillColor').addEventListener('input', (e) => {
   const sel = state.elements.find(el => el.id === state.selectedId && el.type === 'bubble');
@@ -1370,13 +1632,7 @@ function renderPNGDataURL() {
     } else if (el.type === 'bubble') {
       paintBubble(tctx, el, { canvasSize: CANVAS_SIZE });
     } else if (el.type === 'text') {
-      tctx.save();
-      tctx.fillStyle = el.color;
-      tctx.textAlign = 'center';
-      tctx.textBaseline = 'middle';
-      tctx.font = `${el.size}px ${el.font}`;
-      wrapTextHD(tctx, el.text, el.x, el.y, 240, el.size * 1.2);
-      tctx.restore();
+      drawTextElement(tctx, el);
     }
   }
 
@@ -1466,39 +1722,6 @@ document.getElementById('savedImagePreview')?.addEventListener('click', (e) => {
 // ――――――――――――――――――――――――――――――――――― ここまで差し替え
 
 
-// export 用爆発パス（tctx版）
-function burstPathExport(tctx, w, h, spikes = 12, innerRatio = 0.42) {
-  const rx = w * 0.46, ry = h * 0.46;
-  const outer = Math.min(rx, ry);
-  const inner = outer * innerRatio;
-  const step = Math.PI / spikes;
-  let ang = -Math.PI/2;
-
-  tctx.moveTo(Math.cos(ang)*outer, Math.sin(ang)*outer);
-  for (let i=0; i<spikes; i++) {
-    ang += step; tctx.lineTo(Math.cos(ang)*inner, Math.sin(ang)*inner);
-    ang += step; tctx.lineTo(Math.cos(ang)*outer, Math.sin(ang)*outer);
-  }
-}
-
-function wrapTextHD(c, text, x, y, maxWidth, lineHeight) {
-  const words = text.split(/\s+/);
-  let line = '';
-  const lines = [];
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const metrics = c.measureText(testLine);
-    if (metrics.width > maxWidth && n > 0) {
-      lines.push(line);
-      line = words[n] + ' ';
-    } else {
-      line = testLine;
-    }
-  }
-  lines.push(line);
-  const offsetY = -((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((l, i) => c.fillText(l.trim(), x, y + offsetY + i * lineHeight));
-}
 // --- 差し替えここまで ---
 
 // ====== レイヤーUI ======
